@@ -1,6 +1,6 @@
 export const metadata = {
   title: "Cotizador Marprint",
-  description: "Sistema de cotizaciones",
+  description: "Sistema de Cotizaciones",
 };
 
 export default function RootLayout({ children }) {
