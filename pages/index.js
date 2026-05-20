@@ -1,5 +1,24 @@
+const [email, setEmail] = useState("");
+const [password, setPassword] = useState("");
+const [usuario, setUsuario] = useState(null);
+
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+
+async function login(e) {
+  e.preventDefault();
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    alert(error.message);
+  } else {
+    setUsuario(data.user);
+  }
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -49,6 +68,36 @@ export default function Home() {
     }
   }
 
+if (!usuario) {
+  return (
+    <main style={{ padding: 40, fontFamily: "Arial" }}>
+      <h1>Ingreso vendedores</h1>
+
+      <form onSubmit={login}>
+        <input
+          type="email"
+          placeholder="Correo"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={{ display: "block", marginBottom: 10, padding: 10 }}
+        />
+
+        <input
+          type="password"
+          placeholder="Contraseña"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={{ display: "block", marginBottom: 10, padding: 10 }}
+        />
+
+        <button type="submit">
+          Ingresar
+        </button>
+      </form>
+    </main>
+  );
+}
+  
   return (
     <main style={{ padding: 40, fontFamily: "Arial", maxWidth: 800 }}>
       <h1>Cotizador Marprint</h1>
