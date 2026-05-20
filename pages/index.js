@@ -25,6 +25,45 @@ export default function Home() {
     observaciones: "",
   });
 
+  const [cotizacion, setCotizacion] = useState({
+    cliente: "",
+    fv: false,
+    linea: "",
+    nombre_producto: "",
+    largo_abierta: "",
+    ancho_abierta: "",
+    largo_armada: "",
+    ancho_armada: "",
+    alto_armada: "",
+    material_calibre: "",
+    cantidad_1: "",
+    cantidad_2: "",
+    cantidad_3: "",
+    cantidad_4: "",
+    cantidad_5: "",
+    tintas: "",
+    plastico_tiro: "",
+    plastico_retiro: "",
+    barniz_tiro: "",
+    barniz_retiro: "",
+    troquelado: false,
+    repujado: false,
+    pegue: "",
+    envio: "",
+  });
+
+  function cambiar(e) {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  }
+
+  function cambiarCotizacion(e) {
+    const { name, value, type, checked } = e.target;
+    setCotizacion({
+      ...cotizacion,
+      [name]: type === "checkbox" ? checked : value,
+    });
+  }
+
   async function login(e) {
     e.preventDefault();
 
@@ -39,10 +78,6 @@ export default function Home() {
       setUsuario(data.user);
       setPantalla("menu");
     }
-  }
-
-  function cambiar(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
   }
 
   async function guardarCliente(e) {
@@ -67,6 +102,11 @@ export default function Home() {
         observaciones: "",
       });
     }
+  }
+
+  function calcularCotizacion(e) {
+    e.preventDefault();
+    alert("Aquí conectaremos tu fórmula real de cotización.");
   }
 
   if (!usuario) {
@@ -98,7 +138,7 @@ export default function Home() {
   }
 
   return (
-    <main style={{ padding: 40, fontFamily: "Arial", maxWidth: 900 }}>
+    <main style={{ padding: 40, fontFamily: "Arial", maxWidth: 1000 }}>
       <h1>Cotizador Marprint</h1>
       <p>Usuario: {usuario.email}</p>
 
@@ -109,12 +149,18 @@ export default function Home() {
           <h2>Menú principal</h2>
 
           <div style={{ display: "flex", gap: 20, marginTop: 20 }}>
-            <button onClick={() => setPantalla("clientes")} style={{ padding: 30, borderRadius: 12, fontSize: 18 }}>
+            <button
+              onClick={() => setPantalla("clientes")}
+              style={{ padding: 30, borderRadius: 12, fontSize: 18 }}
+            >
               👤<br />
               Crear Cliente
             </button>
 
-            <button onClick={() => setPantalla("cotizar")} style={{ padding: 30, borderRadius: 12, fontSize: 18 }}>
+            <button
+              onClick={() => setPantalla("cotizar")}
+              style={{ padding: 30, borderRadius: 12, fontSize: 18 }}
+            >
               🧾<br />
               Cotizar
             </button>
@@ -151,97 +197,256 @@ export default function Home() {
       )}
 
       {pantalla === "cotizar" && (
-  <div>
+        <div>
+          <button onClick={() => setPantalla("menu")}>← Volver</button>
+          <h2>Cotizador</h2>
 
-    <button onClick={() => setPantalla("menu")}>
-      ← Volver
-    </button>
+          <form onSubmit={calcularCotizacion}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 20,
+                marginTop: 20,
+              }}
+            >
+              <div>
+                <label>CLIENTE *</label>
+                <input
+                  name="cliente"
+                  value={cotizacion.cliente}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-    <h2>Cotizador</h2>
+              <div>
+                <label>FV?</label>
+                <input
+                  type="checkbox"
+                  name="fv"
+                  checked={cotizacion.fv}
+                  onChange={cambiarCotizacion}
+                  style={{ marginLeft: 10 }}
+                />
+              </div>
 
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 20,
-      marginTop: 20
-    }}>
+              <div>
+                <label>LÍNEA *</label>
+                <input
+                  name="linea"
+                  value={cotizacion.linea}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-      <div>
-        <label>CLIENTE</label>
-        <input style={{ width: "100%", padding: 10 }} />
-      </div>
+              <div>
+                <label>NOMBRE DEL PRODUCTO *</label>
+                <input
+                  name="nombre_producto"
+                  value={cotizacion.nombre_producto}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-      <div>
-        <label>LÍNEA</label>
-        <input style={{ width: "100%", padding: 10 }} />
-      </div>
+              <div>
+                <label>LARGO ABIERTA *</label>
+                <input
+                  type="number"
+                  name="largo_abierta"
+                  value={cotizacion.largo_abierta}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-      <div>
-        <label>NOMBRE PRODUCTO</label>
-        <input style={{ width: "100%", padding: 10 }} />
-      </div>
+              <div>
+                <label>ANCHO ABIERTA *</label>
+                <input
+                  type="number"
+                  name="ancho_abierta"
+                  value={cotizacion.ancho_abierta}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-      <div>
-        <label>MATERIAL Y CALIBRE</label>
-        <input style={{ width: "100%", padding: 10 }} />
-      </div>
+              <div>
+                <label>LARGO ARMADA</label>
+                <input
+                  type="number"
+                  name="largo_armada"
+                  value={cotizacion.largo_armada}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-      <div>
-        <label>LARGO ABIERTA</label>
-        <input type="number" style={{ width: "100%", padding: 10 }} />
-      </div>
+              <div>
+                <label>ANCHO ARMADA</label>
+                <input
+                  type="number"
+                  name="ancho_armada"
+                  value={cotizacion.ancho_armada}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-      <div>
-        <label>ANCHO ABIERTA</label>
-        <input type="number" style={{ width: "100%", padding: 10 }} />
-      </div>
+              <div>
+                <label>ALTO ARMADA</label>
+                <input
+                  type="number"
+                  name="alto_armada"
+                  value={cotizacion.alto_armada}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-      <div>
-        <label>LARGO ARMADA</label>
-        <input type="number" style={{ width: "100%", padding: 10 }} />
-      </div>
+              <div>
+                <label>MATERIAL Y CALIBRE *</label>
+                <input
+                  name="material_calibre"
+                  value={cotizacion.material_calibre}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-      <div>
-        <label>ANCHO ARMADA</label>
-        <input type="number" style={{ width: "100%", padding: 10 }} />
-      </div>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <div key={n}>
+                  <label>CANTIDAD {n}{n === 1 ? " *" : ""}</label>
+                  <input
+                    type="number"
+                    name={`cantidad_${n}`}
+                    value={cotizacion[`cantidad_${n}`]}
+                    onChange={cambiarCotizacion}
+                    required={n === 1}
+                    style={{ width: "100%", padding: 10 }}
+                  />
+                </div>
+              ))}
 
-      <div>
-        <label>ALTO ARMADA</label>
-        <input type="number" style={{ width: "100%", padding: 10 }} />
-      </div>
+              <div>
+                <label>TINTAS *</label>
+                <input
+                  type="number"
+                  name="tintas"
+                  value={cotizacion.tintas}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-      <div>
-        <label>TINTAS</label>
-        <input type="number" style={{ width: "100%", padding: 10 }} />
-      </div>
+              <div>
+                <label>PLÁSTICO TIRO</label>
+                <input
+                  name="plastico_tiro"
+                  value={cotizacion.plastico_tiro}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-      <div>
-        <label>CANTIDAD 1</label>
-        <input type="number" style={{ width: "100%", padding: 10 }} />
-      </div>
+              <div>
+                <label>PLÁSTICO RETIRO</label>
+                <input
+                  name="plastico_retiro"
+                  value={cotizacion.plastico_retiro}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-      <div>
-        <label>CANTIDAD 2</label>
-        <input type="number" style={{ width: "100%", padding: 10 }} />
-      </div>
+              <div>
+                <label>BARNIZ TIRO</label>
+                <input
+                  name="barniz_tiro"
+                  value={cotizacion.barniz_tiro}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-    </div>
+              <div>
+                <label>BARNIZ RETIRO</label>
+                <input
+                  name="barniz_retiro"
+                  value={cotizacion.barniz_retiro}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
 
-    <div style={{ marginTop: 30 }}>
-      <button
-        style={{
-          padding: "15px 30px",
-          fontSize: 18,
-          borderRadius: 10
-        }}
-      >
-        CALCULAR COTIZACIÓN
-      </button>
-    </div>
+              <div>
+                <label>TROQUELADO</label>
+                <input
+                  type="checkbox"
+                  name="troquelado"
+                  checked={cotizacion.troquelado}
+                  onChange={cambiarCotizacion}
+                  style={{ marginLeft: 10 }}
+                />
+              </div>
 
-  </div>
-)}
+              <div>
+                <label>REPUJADO</label>
+                <input
+                  type="checkbox"
+                  name="repujado"
+                  checked={cotizacion.repujado}
+                  onChange={cambiarCotizacion}
+                  style={{ marginLeft: 10 }}
+                />
+              </div>
+
+              <div>
+                <label>PEGUE</label>
+                <input
+                  name="pegue"
+                  value={cotizacion.pegue}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
+
+              <div>
+                <label>ENVÍO *</label>
+                <input
+                  name="envio"
+                  value={cotizacion.envio}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginTop: 30 }}>
+              <button
+                type="submit"
+                style={{
+                  padding: "15px 30px",
+                  fontSize: 18,
+                  borderRadius: 10,
+                }}
+              >
+                CALCULAR COTIZACIÓN
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </main>
   );
 }
