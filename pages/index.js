@@ -1,24 +1,5 @@
-const [email, setEmail] = useState("");
-const [password, setPassword] = useState("");
-const [usuario, setUsuario] = useState(null);
-
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-
-async function login(e) {
-  e.preventDefault();
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) {
-    alert(error.message);
-  } else {
-    setUsuario(data.user);
-  }
-}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -26,6 +7,11 @@ const supabase = createClient(
 );
 
 export default function Home() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [usuario, setUsuario] = useState(null);
+  const [mensaje, setMensaje] = useState("");
+
   const [form, setForm] = useState({
     razon_social: "",
     nit: "",
@@ -38,7 +24,20 @@ export default function Home() {
     observaciones: "",
   });
 
-  const [mensaje, setMensaje] = useState("");
+  async function login(e) {
+    e.preventDefault();
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      alert("Usuario o contraseña incorrectos");
+    } else {
+      setUsuario(data.user);
+    }
+  }
 
   function cambiar(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -68,39 +67,41 @@ export default function Home() {
     }
   }
 
-if (!usuario) {
-  return (
-    <main style={{ padding: 40, fontFamily: "Arial" }}>
-      <h1>Ingreso vendedores</h1>
+  if (!usuario) {
+    return (
+      <main style={{ padding: 40, fontFamily: "Arial" }}>
+        <h1>Ingreso vendedores</h1>
 
-      <form onSubmit={login}>
-        <input
-          type="email"
-          placeholder="Correo"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ display: "block", marginBottom: 10, padding: 10 }}
-        />
+        <form onSubmit={login}>
+          <input
+            type="email"
+            placeholder="Correo"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{ display: "block", marginBottom: 10, padding: 10 }}
+          />
 
-        <input
-          type="password"
-          placeholder="Contraseña"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ display: "block", marginBottom: 10, padding: 10 }}
-        />
+          <input
+            type="password"
+            placeholder="Contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{ display: "block", marginBottom: 10, padding: 10 }}
+          />
 
-        <button type="submit">
-          Ingresar
-        </button>
-      </form>
-    </main>
-  );
-}
-  
+          <button type="submit">Ingresar</button>
+        </form>
+      </main>
+    );
+  }
+
   return (
     <main style={{ padding: 40, fontFamily: "Arial", maxWidth: 800 }}>
       <h1>Cotizador Marprint</h1>
+      <p>Usuario: {usuario.email}</p>
+
+      <button onClick={() => setUsuario(null)}>Cerrar sesión</button>
+
       <h2>Crear cliente</h2>
 
       <form onSubmit={guardarCliente}>
