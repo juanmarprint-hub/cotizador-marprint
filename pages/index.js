@@ -151,12 +151,97 @@ export default function Home() {
       )}
 
       {pantalla === "cotizar" && (
-        <div>
-          <button onClick={() => setPantalla("menu")}>← Volver</button>
-          <h2>Cotizar</h2>
-          <p>Aquí construiremos el módulo de cotización.</p>
-        </div>
-      )}
+  <div>
+
+    <button onClick={() => setPantalla("menu")}>
+      ← Volver
+    </button>
+
+    <h2>Cotizador</h2>
+
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 20,
+      marginTop: 20
+    }}>
+
+      <div>
+        <label>CLIENTE</label>
+        <input style={{ width: "100%", padding: 10 }} />
+      </div>
+
+      <div>
+        <label>LÍNEA</label>
+        <input style={{ width: "100%", padding: 10 }} />
+      </div>
+
+      <div>
+        <label>NOMBRE PRODUCTO</label>
+        <input style={{ width: "100%", padding: 10 }} />
+      </div>
+
+      <div>
+        <label>MATERIAL Y CALIBRE</label>
+        <input style={{ width: "100%", padding: 10 }} />
+      </div>
+
+      <div>
+        <label>LARGO ABIERTA</label>
+        <input type="number" style={{ width: "100%", padding: 10 }} />
+      </div>
+
+      <div>
+        <label>ANCHO ABIERTA</label>
+        <input type="number" style={{ width: "100%", padding: 10 }} />
+      </div>
+
+      <div>
+        <label>LARGO ARMADA</label>
+        <input type="number" style={{ width: "100%", padding: 10 }} />
+      </div>
+
+      <div>
+        <label>ANCHO ARMADA</label>
+        <input type="number" style={{ width: "100%", padding: 10 }} />
+      </div>
+
+      <div>
+        <label>ALTO ARMADA</label>
+        <input type="number" style={{ width: "100%", padding: 10 }} />
+      </div>
+
+      <div>
+        <label>TINTAS</label>
+        <input type="number" style={{ width: "100%", padding: 10 }} />
+      </div>
+
+      <div>
+        <label>CANTIDAD 1</label>
+        <input type="number" style={{ width: "100%", padding: 10 }} />
+      </div>
+
+      <div>
+        <label>CANTIDAD 2</label>
+        <input type="number" style={{ width: "100%", padding: 10 }} />
+      </div>
+
+    </div>
+
+    <div style={{ marginTop: 30 }}>
+      <button
+        style={{
+          padding: "15px 30px",
+          fontSize: 18,
+          borderRadius: 10
+        }}
+      >
+        CALCULAR COTIZACIÓN
+      </button>
+    </div>
+
+  </div>
+)}
     </main>
   );
 }
