@@ -95,6 +95,8 @@ export default function Home() {
     );
   }
 
+const [pantalla, setPantalla] = useState("menu");
+
   return (
     <main style={{ padding: 40, fontFamily: "Arial", maxWidth: 800 }}>
       <h1>Cotizador Marprint</h1>
@@ -102,7 +104,45 @@ export default function Home() {
 
       <button onClick={() => setUsuario(null)}>Cerrar sesión</button>
 
-      <h2>Crear cliente</h2>
+      {pantalla === "menu" && (
+  <div>
+    <h2>Menú principal</h2>
+
+    <div style={{ display: "flex", gap: 20, marginTop: 20 }}>
+
+      <button
+        onClick={() => setPantalla("clientes")}
+        style={{
+          padding: 30,
+          borderRadius: 12,
+          border: "1px solid #ccc",
+          cursor: "pointer",
+          fontSize: 18
+        }}
+      >
+{pantalla === "clientes" && (
+        👤<br />
+        Crear Cliente
+      </button>
+
+      <button
+        onClick={() => setPantalla("cotizar")}
+        style={{
+          padding: 30,
+          borderRadius: 12,
+          border: "1px solid #ccc",
+          cursor: "pointer",
+          fontSize: 18
+        }}
+      >
+        🧾<br />
+        Cotizar
+      </button>
+
+    </div>
+  </div>
+)}
+)}
 
       <form onSubmit={guardarCliente}>
         {Object.keys(form).map((campo) => (
