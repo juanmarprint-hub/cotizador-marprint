@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -12,6 +12,16 @@ export default function Home() {
   const [usuario, setUsuario] = useState(null);
   const [mensaje, setMensaje] = useState("");
   const [pantalla, setPantalla] = useState("menu");
+
+  const [catalogos, setCatalogos] = useState({
+    clientes: [],
+    lineas: [],
+    materiales: [],
+    plasticos: [],
+    barnices: [],
+    pegues: [],
+    envios: [],
+  });
 
   const [form, setForm] = useState({
     razon_social: "",
@@ -52,17 +62,41 @@ export default function Home() {
     envio: "",
   });
 
-  function cambiar(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  }
+  useEffect(() => {
+    async function cargarCatalogos() {
+      const [
+        clientes,
+        lineas,
+        materiales,
+        plasticos,
+        barnices,
+        pegues,
+        envios,
+      ] = await Promise.all([
+        supabase.from("clientes").select("*").order("razon_social"),
+        supabase.from("lineas").select("*").order("nombre"),
+        supabase.from("materiales").select("*").order("material"),
+        supabase.from("plasticos").select("*").order("ref"),
+        supabase.from("barnices").select("*").order("ref"),
+        supabase.from("pegues").select("*").order("ref"),
+        supabase.from("envios").select("*").order("ref"),
+      ]);
 
-  function cambiarCotizacion(e) {
-    const { name, value, type, checked } = e.target;
-    setCotizacion({
-      ...cotizacion,
-      [name]: type === "checkbox" ? checked : value,
-    });
-  }
+      setCatalogos({
+        clientes: clientes.data || [],
+        lineas: lineas.data || [],
+        materiales: materiales.data || [],
+        plasticos: plasticos.data || [],
+        barnices: barnices.data || [],
+        pegues: pegues.data || [],
+        envios: envios.data || [],
+      });
+    }
+
+    if (usuario) {
+      cargarCatalogos();
+    }
+  }, [usuario]);
 
   async function login(e) {
     e.preventDefault();
@@ -78,6 +112,18 @@ export default function Home() {
       setUsuario(data.user);
       setPantalla("menu");
     }
+  }
+
+  function cambiar(e) {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  }
+
+  function cambiarCotizacion(e) {
+    const { name, value, type, checked } = e.target;
+    setCotizacion({
+      ...cotizacion,
+      [name]: type === "checkbox" ? checked : value,
+    });
   }
 
   async function guardarCliente(e) {
@@ -106,7 +152,7 @@ export default function Home() {
 
   function calcularCotizacion(e) {
     e.preventDefault();
-    alert("Aquí conectaremos tu fórmula real de cotización.");
+    alert("Siguiente paso: aquí conectaremos el algoritmo de montaje y costos.");
   }
 
   if (!usuario) {
@@ -138,7 +184,7 @@ export default function Home() {
   }
 
   return (
-    <main style={{ padding: 40, fontFamily: "Arial", maxWidth: 1000 }}>
+    <main style={{ padding: 40, fontFamily: "Arial", maxWidth: 1100 }}>
       <h1>Cotizador Marprint</h1>
       <p>Usuario: {usuario.email}</p>
 
@@ -212,13 +258,20 @@ export default function Home() {
             >
               <div>
                 <label>CLIENTE *</label>
-                <input
+                <select
                   name="cliente"
                   value={cotizacion.cliente}
                   onChange={cambiarCotizacion}
                   required
                   style={{ width: "100%", padding: 10 }}
-                />
+                >
+                  <option value="">Seleccionar cliente</option>
+                  {catalogos.clientes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.razon_social}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -234,13 +287,20 @@ export default function Home() {
 
               <div>
                 <label>LÍNEA *</label>
-                <input
+                <select
                   name="linea"
                   value={cotizacion.linea}
                   onChange={cambiarCotizacion}
                   required
                   style={{ width: "100%", padding: 10 }}
-                />
+                >
+                  <option value="">Seleccionar línea</option>
+                  {catalogos.lineas.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.nombre}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -258,6 +318,7 @@ export default function Home() {
                 <label>LARGO ABIERTA *</label>
                 <input
                   type="number"
+                  step="0.01"
                   name="largo_abierta"
                   value={cotizacion.largo_abierta}
                   onChange={cambiarCotizacion}
@@ -270,6 +331,7 @@ export default function Home() {
                 <label>ANCHO ABIERTA *</label>
                 <input
                   type="number"
+                  step="0.01"
                   name="ancho_abierta"
                   value={cotizacion.ancho_abierta}
                   onChange={cambiarCotizacion}
@@ -282,6 +344,7 @@ export default function Home() {
                 <label>LARGO ARMADA</label>
                 <input
                   type="number"
+                  step="0.01"
                   name="largo_armada"
                   value={cotizacion.largo_armada}
                   onChange={cambiarCotizacion}
@@ -293,6 +356,7 @@ export default function Home() {
                 <label>ANCHO ARMADA</label>
                 <input
                   type="number"
+                  step="0.01"
                   name="ancho_armada"
                   value={cotizacion.ancho_armada}
                   onChange={cambiarCotizacion}
@@ -304,6 +368,7 @@ export default function Home() {
                 <label>ALTO ARMADA</label>
                 <input
                   type="number"
+                  step="0.01"
                   name="alto_armada"
                   value={cotizacion.alto_armada}
                   onChange={cambiarCotizacion}
@@ -313,13 +378,20 @@ export default function Home() {
 
               <div>
                 <label>MATERIAL Y CALIBRE *</label>
-                <input
+                <select
                   name="material_calibre"
                   value={cotizacion.material_calibre}
                   onChange={cambiarCotizacion}
                   required
                   style={{ width: "100%", padding: 10 }}
-                />
+                >
+                  <option value="">Seleccionar material</option>
+                  {catalogos.materiales.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.material} - Calibre {m.calibre} - ${m.valor_pap_m2}/m²
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {[1, 2, 3, 4, 5].map((n) => (
@@ -350,42 +422,70 @@ export default function Home() {
 
               <div>
                 <label>PLÁSTICO TIRO</label>
-                <input
+                <select
                   name="plastico_tiro"
                   value={cotizacion.plastico_tiro}
                   onChange={cambiarCotizacion}
                   style={{ width: "100%", padding: 10 }}
-                />
+                >
+                  <option value="">Ninguno</option>
+                  {catalogos.plasticos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.ref} - ${p.valor_plas_m2}/m²
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label>PLÁSTICO RETIRO</label>
-                <input
+                <select
                   name="plastico_retiro"
                   value={cotizacion.plastico_retiro}
                   onChange={cambiarCotizacion}
                   style={{ width: "100%", padding: 10 }}
-                />
+                >
+                  <option value="">Ninguno</option>
+                  {catalogos.plasticos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.ref} - ${p.valor_plas_m2}/m²
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label>BARNIZ TIRO</label>
-                <input
+                <select
                   name="barniz_tiro"
                   value={cotizacion.barniz_tiro}
                   onChange={cambiarCotizacion}
                   style={{ width: "100%", padding: 10 }}
-                />
+                >
+                  <option value="">Ninguno</option>
+                  {catalogos.barnices.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.ref} - ${b.valor_bar_m2}/m²
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label>BARNIZ RETIRO</label>
-                <input
+                <select
                   name="barniz_retiro"
                   value={cotizacion.barniz_retiro}
                   onChange={cambiarCotizacion}
                   style={{ width: "100%", padding: 10 }}
-                />
+                >
+                  <option value="">Ninguno</option>
+                  {catalogos.barnices.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.ref} - ${b.valor_bar_m2}/m²
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -412,23 +512,37 @@ export default function Home() {
 
               <div>
                 <label>PEGUE</label>
-                <input
+                <select
                   name="pegue"
                   value={cotizacion.pegue}
                   onChange={cambiarCotizacion}
                   style={{ width: "100%", padding: 10 }}
-                />
+                >
+                  <option value="">Ninguno</option>
+                  {catalogos.pegues.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.ref} - ${p.valor_peg_und}/und
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label>ENVÍO *</label>
-                <input
+                <select
                   name="envio"
                   value={cotizacion.envio}
                   onChange={cambiarCotizacion}
                   required
                   style={{ width: "100%", padding: 10 }}
-                />
+                >
+                  <option value="">Seleccionar envío</option>
+                  {catalogos.envios.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.ref} - ${e.valor_env_kg}/kg
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
