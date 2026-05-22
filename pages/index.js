@@ -6,12 +6,75 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+const anchosRollo = [35, 45, 52.5, 60, 70, 90, 105];
+
+function optimizarMontaje(largoCaja, anchoCaja) {
+  const margen = 2;
+  const opciones = [];
+
+  const orientaciones = [
+    { nombre: "Normal", largo: largoCaja, ancho: anchoCaja },
+    { nombre: "Girada", largo: anchoCaja, ancho: largoCaja },
+  ];
+
+  for (const orientacion of orientaciones) {
+    for (let columnas = 1; columnas <= 10; columnas++) {
+      for (let filas = 1; filas <= 10; filas++) {
+        const anchoMontaje = orientacion.ancho * columnas;
+        const largoMontaje = orientacion.largo * filas;
+
+        const anchoHoja = anchoMontaje + margen;
+        const largoHoja = largoMontaje + margen;
+
+        const cumpleMinimo = anchoHoja >= 35 && largoHoja >= 45;
+        const cumpleMaximo = anchoHoja <= 70 && largoHoja <= 100;
+
+        if (!cumpleMinimo || !cumpleMaximo) continue;
+
+        for (const rollo of anchosRollo) {
+          if (anchoHoja <= rollo) {
+            const areaHoja = anchoHoja * largoHoja;
+            const areaPiezas = orientacion.ancho * orientacion.largo * columnas * filas;
+            const aprovechamiento = (areaPiezas / areaHoja) * 100;
+
+            opciones.push({
+              orientacion: orientacion.nombre,
+              columnas,
+              filas,
+              piezasPorHoja: columnas * filas,
+              anchoMontaje,
+              largoMontaje,
+              anchoHoja,
+              largoHoja,
+              rollo,
+              desperdicioAncho: rollo - anchoHoja,
+              aprovechamiento,
+              desperdicioPorcentaje: 100 - aprovechamiento,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return opciones.sort((a, b) => {
+    if (a.desperdicioAncho !== b.desperdicioAncho) {
+      return a.desperdicioAncho - b.desperdicioAncho;
+    }
+    if (b.piezasPorHoja !== a.piezasPorHoja) {
+      return b.piezasPorHoja - a.piezasPorHoja;
+    }
+    return b.aprovechamiento - a.aprovechamiento;
+  })[0];
+}
+
 export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [usuario, setUsuario] = useState(null);
   const [mensaje, setMensaje] = useState("");
   const [pantalla, setPantalla] = useState("menu");
+  const [resultadoMontaje, setResultadoMontaje] = useState(null);
 
   const [catalogos, setCatalogos] = useState({
     clientes: [],
@@ -64,23 +127,16 @@ export default function Home() {
 
   useEffect(() => {
     async function cargarCatalogos() {
-      const [
-        clientes,
-        lineas,
-        materiales,
-        plasticos,
-        barnices,
-        pegues,
-        envios,
-      ] = await Promise.all([
-        supabase.from("clientes").select("*").order("razon_social"),
-        supabase.from("lineas").select("*").order("nombre"),
-        supabase.from("materiales").select("*").order("material"),
-        supabase.from("plasticos").select("*").order("ref"),
-        supabase.from("barnices").select("*").order("ref"),
-        supabase.from("pegues").select("*").order("ref"),
-        supabase.from("envios").select("*").order("ref"),
-      ]);
+      const [clientes, lineas, materiales, plasticos, barnices, pegues, envios] =
+        await Promise.all([
+          supabase.from("clientes").select("*").order("razon_social"),
+          supabase.from("lineas").select("*").order("nombre"),
+          supabase.from("materiales").select("*").order("material"),
+          supabase.from("plasticos").select("*").order("ref"),
+          supabase.from("barnices").select("*").order("ref"),
+          supabase.from("pegues").select("*").order("ref"),
+          supabase.from("envios").select("*").order("ref"),
+        ]);
 
       setCatalogos({
         clientes: clientes.data || [],
@@ -93,10 +149,19 @@ export default function Home() {
       });
     }
 
-    if (usuario) {
-      cargarCatalogos();
-    }
+    if (usuario) cargarCatalogos();
   }, [usuario]);
+
+  useEffect(() => {
+    const largo = parseFloat(cotizacion.largo_abierta);
+    const ancho = parseFloat(cotizacion.ancho_abierta);
+
+    if (largo > 0 && ancho > 0) {
+      setResultadoMontaje(optimizarMontaje(largo, ancho));
+    } else {
+      setResultadoMontaje(null);
+    }
+  }, [cotizacion.largo_abierta, cotizacion.ancho_abierta]);
 
   async function login(e) {
     e.preventDefault();
@@ -152,7 +217,7 @@ export default function Home() {
 
   function calcularCotizacion(e) {
     e.preventDefault();
-    alert("Siguiente paso: aquí conectaremos el algoritmo de montaje y costos.");
+    alert("Montaje calculado. El siguiente paso será conectar los costos.");
   }
 
   if (!usuario) {
@@ -248,143 +313,65 @@ export default function Home() {
           <h2>Cotizador</h2>
 
           <form onSubmit={calcularCotizacion}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 20,
-                marginTop: 20,
-              }}
-            >
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
               <div>
                 <label>CLIENTE *</label>
-                <select
-                  name="cliente"
-                  value={cotizacion.cliente}
-                  onChange={cambiarCotizacion}
-                  required
-                  style={{ width: "100%", padding: 10 }}
-                >
+                <select name="cliente" value={cotizacion.cliente} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }}>
                   <option value="">Seleccionar cliente</option>
                   {catalogos.clientes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.razon_social}
-                    </option>
+                    <option key={c.id} value={c.id}>{c.razon_social}</option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>FV?</label>
-                <input
-                  type="checkbox"
-                  name="fv"
-                  checked={cotizacion.fv}
-                  onChange={cambiarCotizacion}
-                  style={{ marginLeft: 10 }}
-                />
+                <input type="checkbox" name="fv" checked={cotizacion.fv} onChange={cambiarCotizacion} style={{ marginLeft: 10 }} />
               </div>
 
               <div>
                 <label>LÍNEA *</label>
-                <select
-                  name="linea"
-                  value={cotizacion.linea}
-                  onChange={cambiarCotizacion}
-                  required
-                  style={{ width: "100%", padding: 10 }}
-                >
+                <select name="linea" value={cotizacion.linea} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }}>
                   <option value="">Seleccionar línea</option>
                   {catalogos.lineas.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.nombre}
-                    </option>
+                    <option key={l.id} value={l.id}>{l.nombre}</option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>NOMBRE DEL PRODUCTO *</label>
-                <input
-                  name="nombre_producto"
-                  value={cotizacion.nombre_producto}
-                  onChange={cambiarCotizacion}
-                  required
-                  style={{ width: "100%", padding: 10 }}
-                />
+                <input name="nombre_producto" value={cotizacion.nombre_producto} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }} />
               </div>
 
               <div>
                 <label>LARGO ABIERTA *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="largo_abierta"
-                  value={cotizacion.largo_abierta}
-                  onChange={cambiarCotizacion}
-                  required
-                  style={{ width: "100%", padding: 10 }}
-                />
+                <input type="number" step="0.01" name="largo_abierta" value={cotizacion.largo_abierta} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }} />
               </div>
 
               <div>
                 <label>ANCHO ABIERTA *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="ancho_abierta"
-                  value={cotizacion.ancho_abierta}
-                  onChange={cambiarCotizacion}
-                  required
-                  style={{ width: "100%", padding: 10 }}
-                />
+                <input type="number" step="0.01" name="ancho_abierta" value={cotizacion.ancho_abierta} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }} />
               </div>
 
               <div>
                 <label>LARGO ARMADA</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="largo_armada"
-                  value={cotizacion.largo_armada}
-                  onChange={cambiarCotizacion}
-                  style={{ width: "100%", padding: 10 }}
-                />
+                <input type="number" step="0.01" name="largo_armada" value={cotizacion.largo_armada} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }} />
               </div>
 
               <div>
                 <label>ANCHO ARMADA</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="ancho_armada"
-                  value={cotizacion.ancho_armada}
-                  onChange={cambiarCotizacion}
-                  style={{ width: "100%", padding: 10 }}
-                />
+                <input type="number" step="0.01" name="ancho_armada" value={cotizacion.ancho_armada} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }} />
               </div>
 
               <div>
                 <label>ALTO ARMADA</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="alto_armada"
-                  value={cotizacion.alto_armada}
-                  onChange={cambiarCotizacion}
-                  style={{ width: "100%", padding: 10 }}
-                />
+                <input type="number" step="0.01" name="alto_armada" value={cotizacion.alto_armada} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }} />
               </div>
 
               <div>
                 <label>MATERIAL Y CALIBRE *</label>
-                <select
-                  name="material_calibre"
-                  value={cotizacion.material_calibre}
-                  onChange={cambiarCotizacion}
-                  required
-                  style={{ width: "100%", padding: 10 }}
-                >
+                <select name="material_calibre" value={cotizacion.material_calibre} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }}>
                   <option value="">Seleccionar material</option>
                   {catalogos.materiales.map((m) => (
                     <option key={m.id} value={m.id}>
@@ -397,164 +384,108 @@ export default function Home() {
               {[1, 2, 3, 4, 5].map((n) => (
                 <div key={n}>
                   <label>CANTIDAD {n}{n === 1 ? " *" : ""}</label>
-                  <input
-                    type="number"
-                    name={`cantidad_${n}`}
-                    value={cotizacion[`cantidad_${n}`]}
-                    onChange={cambiarCotizacion}
-                    required={n === 1}
-                    style={{ width: "100%", padding: 10 }}
-                  />
+                  <input type="number" name={`cantidad_${n}`} value={cotizacion[`cantidad_${n}`]} onChange={cambiarCotizacion} required={n === 1} style={{ width: "100%", padding: 10 }} />
                 </div>
               ))}
 
               <div>
                 <label>TINTAS *</label>
-                <input
-                  type="number"
-                  name="tintas"
-                  value={cotizacion.tintas}
-                  onChange={cambiarCotizacion}
-                  required
-                  style={{ width: "100%", padding: 10 }}
-                />
+                <input type="number" name="tintas" value={cotizacion.tintas} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }} />
               </div>
 
               <div>
                 <label>PLÁSTICO TIRO</label>
-                <select
-                  name="plastico_tiro"
-                  value={cotizacion.plastico_tiro}
-                  onChange={cambiarCotizacion}
-                  style={{ width: "100%", padding: 10 }}
-                >
+                <select name="plastico_tiro" value={cotizacion.plastico_tiro} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }}>
                   <option value="">Ninguno</option>
                   {catalogos.plasticos.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.ref} - ${p.valor_plas_m2}/m²
-                    </option>
+                    <option key={p.id} value={p.id}>{p.ref} - ${p.valor_plas_m2}/m²</option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>PLÁSTICO RETIRO</label>
-                <select
-                  name="plastico_retiro"
-                  value={cotizacion.plastico_retiro}
-                  onChange={cambiarCotizacion}
-                  style={{ width: "100%", padding: 10 }}
-                >
+                <select name="plastico_retiro" value={cotizacion.plastico_retiro} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }}>
                   <option value="">Ninguno</option>
                   {catalogos.plasticos.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.ref} - ${p.valor_plas_m2}/m²
-                    </option>
+                    <option key={p.id} value={p.id}>{p.ref} - ${p.valor_plas_m2}/m²</option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>BARNIZ TIRO</label>
-                <select
-                  name="barniz_tiro"
-                  value={cotizacion.barniz_tiro}
-                  onChange={cambiarCotizacion}
-                  style={{ width: "100%", padding: 10 }}
-                >
+                <select name="barniz_tiro" value={cotizacion.barniz_tiro} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }}>
                   <option value="">Ninguno</option>
                   {catalogos.barnices.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.ref} - ${b.valor_bar_m2}/m²
-                    </option>
+                    <option key={b.id} value={b.id}>{b.ref} - ${b.valor_bar_m2}/m²</option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>BARNIZ RETIRO</label>
-                <select
-                  name="barniz_retiro"
-                  value={cotizacion.barniz_retiro}
-                  onChange={cambiarCotizacion}
-                  style={{ width: "100%", padding: 10 }}
-                >
+                <select name="barniz_retiro" value={cotizacion.barniz_retiro} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }}>
                   <option value="">Ninguno</option>
                   {catalogos.barnices.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.ref} - ${b.valor_bar_m2}/m²
-                    </option>
+                    <option key={b.id} value={b.id}>{b.ref} - ${b.valor_bar_m2}/m²</option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>TROQUELADO</label>
-                <input
-                  type="checkbox"
-                  name="troquelado"
-                  checked={cotizacion.troquelado}
-                  onChange={cambiarCotizacion}
-                  style={{ marginLeft: 10 }}
-                />
+                <input type="checkbox" name="troquelado" checked={cotizacion.troquelado} onChange={cambiarCotizacion} style={{ marginLeft: 10 }} />
               </div>
 
               <div>
                 <label>REPUJADO</label>
-                <input
-                  type="checkbox"
-                  name="repujado"
-                  checked={cotizacion.repujado}
-                  onChange={cambiarCotizacion}
-                  style={{ marginLeft: 10 }}
-                />
+                <input type="checkbox" name="repujado" checked={cotizacion.repujado} onChange={cambiarCotizacion} style={{ marginLeft: 10 }} />
               </div>
 
               <div>
                 <label>PEGUE</label>
-                <select
-                  name="pegue"
-                  value={cotizacion.pegue}
-                  onChange={cambiarCotizacion}
-                  style={{ width: "100%", padding: 10 }}
-                >
+                <select name="pegue" value={cotizacion.pegue} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }}>
                   <option value="">Ninguno</option>
                   {catalogos.pegues.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.ref} - ${p.valor_peg_und}/und
-                    </option>
+                    <option key={p.id} value={p.id}>{p.ref} - ${p.valor_peg_und}/und</option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>ENVÍO *</label>
-                <select
-                  name="envio"
-                  value={cotizacion.envio}
-                  onChange={cambiarCotizacion}
-                  required
-                  style={{ width: "100%", padding: 10 }}
-                >
+                <select name="envio" value={cotizacion.envio} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }}>
                   <option value="">Seleccionar envío</option>
                   {catalogos.envios.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.ref} - ${e.valor_env_kg}/kg
-                    </option>
+                    <option key={e.id} value={e.id}>{e.ref} - ${e.valor_env_kg}/kg</option>
                   ))}
                 </select>
               </div>
             </div>
 
+            {resultadoMontaje && (
+              <div style={{ marginTop: 30, padding: 20, border: "1px solid #ccc", borderRadius: 12 }}>
+                <h3>Resultado de montaje</h3>
+                <p><strong>Orientación:</strong> {resultadoMontaje.orientacion}</p>
+                <p><strong>Montaje:</strong> {resultadoMontaje.columnas} columnas x {resultadoMontaje.filas} filas</p>
+                <p><strong>Piezas por hoja:</strong> {resultadoMontaje.piezasPorHoja}</p>
+                <p><strong>Medida montaje:</strong> {resultadoMontaje.anchoMontaje.toFixed(2)} x {resultadoMontaje.largoMontaje.toFixed(2)} cm</p>
+                <p><strong>Medida hoja:</strong> {resultadoMontaje.anchoHoja.toFixed(2)} x {resultadoMontaje.largoHoja.toFixed(2)} cm</p>
+                <p><strong>Rollo recomendado:</strong> {resultadoMontaje.rollo} cm</p>
+                <p><strong>Desperdicio ancho:</strong> {resultadoMontaje.desperdicioAncho.toFixed(2)} cm</p>
+                <p><strong>Aprovechamiento:</strong> {resultadoMontaje.aprovechamiento.toFixed(2)}%</p>
+              </div>
+            )}
+
+            {!resultadoMontaje && cotizacion.largo_abierta && cotizacion.ancho_abierta && (
+              <div style={{ marginTop: 30, padding: 20, border: "1px solid red", borderRadius: 12 }}>
+                No se encontró un montaje válido con estas medidas.
+              </div>
+            )}
+
             <div style={{ marginTop: 30 }}>
-              <button
-                type="submit"
-                style={{
-                  padding: "15px 30px",
-                  fontSize: 18,
-                  borderRadius: 10,
-                }}
-              >
+              <button type="submit" style={{ padding: "15px 30px", fontSize: 18, borderRadius: 10 }}>
                 CALCULAR COTIZACIÓN
               </button>
             </div>
