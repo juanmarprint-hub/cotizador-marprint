@@ -271,157 +271,195 @@ export default function Home() {
     return numero(final?.porcentaje || 0.4);
   }
 
-  function calcularCotizacion(e) {
-    e.preventDefault();
+function calcularCotizacion(e) {
+  e.preventDefault();
 
-    if (!montajeSeleccionado) {
-      alert("No hay montaje seleccionado.");
-      return;
-    }
-
-    const material = buscarPorId(catalogos.materiales, cotizacion.material_calibre);
-    const plasticoTiro = buscarPorId(catalogos.plasticos, cotizacion.plastico_tiro);
-    const plasticoRetiro = buscarPorId(catalogos.plasticos, cotizacion.plastico_retiro);
-    const barnizTiro = buscarPorId(catalogos.barnices, cotizacion.barniz_tiro);
-    const barnizRetiro = buscarPorId(catalogos.barnices, cotizacion.barniz_retiro);
-    const pegue = buscarPorId(catalogos.pegues, cotizacion.pegue);
-    const envio = buscarPorId(catalogos.envios, cotizacion.envio);
-
-    if (!material) {
-      alert("Selecciona material.");
-      return;
-    }
-
-    const areaHojaM2 = (montajeSeleccionado.anchoHoja * montajeSeleccionado.largoHoja) / 10000;
-    const tintas = numero(cotizacion.tintas);
-
-    const cantidades = [1, 2, 3, 4, 5]
-      .map((n) => numero(cotizacion[`cantidad_${n}`]))
-      .filter((c) => c > 0);
-
-    const nuevosResultados = cantidades.map((cantidad, index) => {
-      const hojas = Math.ceil(cantidad / montajeSeleccionado.piezasPorHoja);
-
-      const papel = areaHojaM2 * numero(material.valor_pap_m2) * hojas;
-
-      const diseno = constante("DISEÑO");
-      const ctp = constante("CTP") * tintas;
-
-      const troquel = cotizacion.troquelado ? constante("TROQUEL") * cantidad : 0;
-
-      const conversion =
-        constante("CUADRE DE CONVERSION") +
-        ((numero(material.peso_basico) * areaHojaM2 * hojas) / 1000000) *
-          constante("CONVERSION X TON");
-
-      const corte = constante("CORTE") * hojas;
-
-      const impresion =
-        constante("CUADRE DE IMPRESIÓN") +
-        constante("IMPRESIÓN") * tintas * hojas;
-
-      const plastificadoTiro = plasticoTiro
-        ? areaHojaM2 * numero(plasticoTiro.valor_plas_m2) * hojas
-        : 0;
-
-      const plastificadoRetiro = plasticoRetiro
-        ? areaHojaM2 * numero(plasticoRetiro.valor_plas_m2) * hojas
-        : 0;
-
-      const barnizTiroCosto = barnizTiro
-        ? constante("CUADRE BARNIZ") + areaHojaM2 * numero(barnizTiro.valor_bar_m2) * hojas
-        : 0;
-
-      const barnizRetiroCosto = barnizRetiro
-        ? constante("CUADRE BARNIZ") + areaHojaM2 * numero(barnizRetiro.valor_bar_m2) * hojas
-        : 0;
-
-      const repujado = cotizacion.repujado
-        ? constante("CUADRE TROQUEL O REPUJE") + constante("CLISE REPUJE")
-        : 0;
-
-      const troquelado = cotizacion.troquelado
-        ? constante("CUADRE TROQUEL O REPUJE") + constante("MILLAR TROQUELADO") * cantidad
-        : 0;
-
-      const descartonado = constante("DESCARTONE/UND") * cantidad;
-
-      const ventanilla = 0;
-
-      const pegueCosto = pegue
-        ? numero(pegue.cuadre_maquina) + numero(pegue.valor_peg_und) * cantidad
-        : 0;
-
-      const costoEspecial = 0;
-
-      const pesoKg = (numero(material.peso_basico) * areaHojaM2 * hojas) / 1000;
-      const empaque = constante("FACTOR EMPAQUE") * cantidad * 1000;
-
-      const envioCosto = envio ? pesoKg * numero(envio.valor_env_kg) : 0;
-
-      const subtotalSinComision =
-        papel +
-        diseno +
-        ctp +
-        troquel +
-        conversion +
-        corte +
-        impresion +
-        plastificadoTiro +
-        plastificadoRetiro +
-        barnizTiroCosto +
-        barnizRetiroCosto +
-        repujado +
-        troquelado +
-        descartonado +
-        ventanilla +
-        pegueCosto +
-        costoEspecial +
-        empaque +
-        envioCosto;
-
-      const comision = subtotalSinComision * constante("COMISION");
-
-      const total = subtotalSinComision + comision;
-      const gananciaPorcentaje = utilidadPorTotal(total);
-      const gananciaPesos = total * gananciaPorcentaje;
-      const totalTrabajo = total + gananciaPesos;
-      const valorUnitario = totalTrabajo / cantidad;
-
-      return {
-        nombre: `Cantidad ${index + 1}`,
-        cantidad,
-        hojas,
-        papel,
-        diseno,
-        ctp,
-        troquel,
-        conversion,
-        corte,
-        impresion,
-        plastificadoTiro,
-        plastificadoRetiro,
-        barnizTiroCosto,
-        barnizRetiroCosto,
-        repujado,
-        troquelado,
-        descartonado,
-        ventanilla,
-        pegueCosto,
-        costoEspecial,
-        empaque,
-        envioCosto,
-        comision,
-        total,
-        gananciaPorcentaje,
-        gananciaPesos,
-        totalTrabajo,
-        valorUnitario,
-      };
-    });
-
-    setResultados(nuevosResultados);
+  if (!montajeSeleccionado) {
+    alert("No hay montaje seleccionado.");
+    return;
   }
+
+  const material = buscarPorId(catalogos.materiales, cotizacion.material_calibre);
+  const plasticoTiro = buscarPorId(catalogos.plasticos, cotizacion.plastico_tiro);
+  const plasticoRetiro = buscarPorId(catalogos.plasticos, cotizacion.plastico_retiro);
+  const barnizTiro = buscarPorId(catalogos.barnices, cotizacion.barniz_tiro);
+  const barnizRetiro = buscarPorId(catalogos.barnices, cotizacion.barniz_retiro);
+  const pegue = buscarPorId(catalogos.pegues, cotizacion.pegue);
+  const envio = buscarPorId(catalogos.envios, cotizacion.envio);
+
+  if (!material) {
+    alert("Selecciona material.");
+    return;
+  }
+
+  const areaCosteoM2 =
+    (montajeSeleccionado.rollo * montajeSeleccionado.largoHoja) / 10000;
+
+  const tintas = numero(cotizacion.tintas);
+
+  const cantidades = [1, 2, 3, 4, 5]
+    .map((n) => numero(cotizacion[`cantidad_${n}`]))
+    .filter((c) => c > 0);
+
+  const nuevosResultados = cantidades.map((cantidad, index) => {
+    const tirosBase = Math.ceil(cantidad / montajeSeleccionado.piezasPorHoja);
+
+    let sobrantes = 0;
+
+    if (tirosBase < 1000) {
+      sobrantes = 100;
+    } else if (tirosBase < 3000) {
+      sobrantes = Math.ceil(tirosBase * 0.10);
+    } else if (tirosBase > 3001) {
+      sobrantes = 300;
+    }
+
+    const tirosConSobrantes = tirosBase + sobrantes;
+
+    const papelBase =
+      areaCosteoM2 *
+      tirosConSobrantes *
+      numero(material.valor_pap_m2);
+
+    const papel = cotizacion.fv ? papelBase : papelBase * 1.19;
+
+    const diseno = constante("DISEÑO");
+
+    const ctp = constante("CTP") * tintas;
+
+    const troquel = cotizacion.troquelado
+      ? constante("TROQUEL") * cantidad
+      : 0;
+
+    const pesoKg =
+      (numero(material.peso_basico) * areaCosteoM2 * tirosConSobrantes) / 1000;
+
+    const conversion =
+      constante("CUADRE DE CONVERSION") +
+      (pesoKg / 1000) * constante("CONVERSION X TON");
+
+    const corte = constante("CORTE") * tirosBase;
+
+    const impresion =
+      constante("CUADRE DE IMPRESIÓN") +
+      (tirosBase < 1000
+        ? 1000 * tintas * constante("IMPRESIÓN")
+        : tirosBase * tintas * constante("IMPRESIÓN"));
+
+    const plastificadoTiro = plasticoTiro
+      ? areaCosteoM2 * tirosBase * numero(plasticoTiro.valor_plas_m2)
+      : 0;
+
+    const plastificadoRetiro = plasticoRetiro
+      ? areaCosteoM2 * tirosBase * numero(plasticoRetiro.valor_plas_m2)
+      : 0;
+
+    const barnizTiroCosto = barnizTiro
+      ? constante("CUADRE BARNIZ") +
+        areaCosteoM2 * tirosBase * numero(barnizTiro.valor_bar_m2)
+      : 0;
+
+    const barnizRetiroCosto = barnizRetiro
+      ? constante("CUADRE BARNIZ") +
+        areaCosteoM2 * tirosBase * numero(barnizRetiro.valor_bar_m2)
+      : 0;
+
+    const repujado = cotizacion.repujado
+      ? constante("CUADRE TROQUEL O REPUJE") + constante("CLISE REPUJE")
+      : 0;
+
+    const troquelado = cotizacion.troquelado
+      ? constante("CUADRE TROQUEL O REPUJE") +
+        constante("MILLAR TROQUELADO") * cantidad
+      : 0;
+
+    const descartonado =
+      cotizacion.troquelado
+        ? constante("DESCARTONE/UND") * cantidad
+        : 0;
+
+    const ventanilla = 0;
+
+    const pegueCosto = pegue
+      ? numero(pegue.cuadre_maquina) + numero(pegue.valor_peg_und) * cantidad
+      : 0;
+
+    const costoEspecial = 0;
+
+    const empaque =
+      constante("FACTOR EMPAQUE") * cantidad * 1000;
+
+    const envioCosto = envio
+      ? pesoKg * numero(envio.valor_env_kg)
+      : 0;
+
+    const subtotalSinComision =
+      papel +
+      diseno +
+      ctp +
+      troquel +
+      conversion +
+      corte +
+      impresion +
+      plastificadoTiro +
+      plastificadoRetiro +
+      barnizTiroCosto +
+      barnizRetiroCosto +
+      repujado +
+      troquelado +
+      descartonado +
+      ventanilla +
+      pegueCosto +
+      costoEspecial +
+      empaque +
+      envioCosto;
+
+    const comision =
+      subtotalSinComision * constante("COMISION");
+
+    const total = subtotalSinComision + comision;
+
+    const gananciaPorcentaje = utilidadPorTotal(total);
+    const gananciaPesos = total * gananciaPorcentaje;
+    const totalTrabajo = total + gananciaPesos;
+    const valorUnitario = totalTrabajo / cantidad;
+
+    return {
+      nombre: `Cantidad ${index + 1}`,
+      cantidad,
+      tirosBase,
+      sobrantes,
+      tirosConSobrantes,
+      papel,
+      diseno,
+      ctp,
+      troquel,
+      conversion,
+      corte,
+      impresion,
+      plastificadoTiro,
+      plastificadoRetiro,
+      barnizTiroCosto,
+      barnizRetiroCosto,
+      repujado,
+      troquelado,
+      descartonado,
+      ventanilla,
+      pegueCosto,
+      costoEspecial,
+      empaque,
+      envioCosto,
+      comision,
+      total,
+      gananciaPorcentaje,
+      gananciaPesos,
+      totalTrabajo,
+      valorUnitario,
+    };
+  });
+
+  setResultados(nuevosResultados);
+}
 
   if (!usuario) {
     return (
