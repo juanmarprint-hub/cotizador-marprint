@@ -8,6 +8,18 @@ const supabase = createClient(
 
 const anchosRollo = [35, 45, 52.5, 60, 70, 90, 105];
 
+function numero(valor) {
+  return Number(valor || 0);
+}
+
+function moneda(valor) {
+  return new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(valor || 0);
+}
+
 function obtenerMejoresMontajes(largoCaja, anchoCaja) {
   const margen = 2;
   const opciones = [];
@@ -22,7 +34,6 @@ function obtenerMejoresMontajes(largoCaja, anchoCaja) {
       for (let filas = 1; filas <= 10; filas++) {
         const anchoMontaje = orientacion.ancho * columnas;
         const largoMontaje = orientacion.largo * filas;
-
         const anchoHoja = anchoMontaje + margen;
         const largoHoja = largoMontaje + margen;
 
@@ -31,11 +42,9 @@ function obtenerMejoresMontajes(largoCaja, anchoCaja) {
 
         for (const rollo of anchosRollo) {
           if (anchoHoja <= rollo) {
-            const areaHoja = anchoHoja * largoHoja;
+            const areaCosteo = rollo * largoHoja;
             const areaPiezas =
               orientacion.ancho * orientacion.largo * columnas * filas;
-
-            const aprovechamiento = (areaPiezas / areaHoja) * 100;
 
             opciones.push({
               id: `${orientacion.nombre}-${columnas}-${filas}-${rollo}`,
@@ -49,7 +58,7 @@ function obtenerMejoresMontajes(largoCaja, anchoCaja) {
               largoHoja,
               rollo,
               desperdicioAncho: rollo - anchoHoja,
-              aprovechamiento,
+              aprovechamiento: (areaPiezas / areaCosteo) * 100,
             });
           }
         }
@@ -57,25 +66,27 @@ function obtenerMejoresMontajes(largoCaja, anchoCaja) {
     }
   }
 
-  return opciones
+  const mejores = [...opciones]
     .sort((a, b) => {
-      if (b.piezasPorHoja !== a.piezasPorHoja) return b.piezasPorHoja - a.piezasPorHoja;
-      if (a.desperdicioAncho !== b.desperdicioAncho) return a.desperdicioAncho - b.desperdicioAncho;
+      if (b.piezasPorHoja !== a.piezasPorHoja) {
+        return b.piezasPorHoja - a.piezasPorHoja;
+      }
+      if (a.desperdicioAncho !== b.desperdicioAncho) {
+        return a.desperdicioAncho - b.desperdicioAncho;
+      }
       return b.aprovechamiento - a.aprovechamiento;
     })
     .slice(0, 4);
-}
 
-function moneda(valor) {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    maximumFractionDigits: 0,
-  }).format(valor || 0);
-}
+  const masPequeno = [...opciones].sort((a, b) => {
+    return a.anchoHoja * a.largoHoja - b.anchoHoja * b.largoHoja;
+  })[0];
 
-function numero(valor) {
-  return Number(valor || 0);
+  if (masPequeno && !mejores.some((m) => m.id === masPequeno.id)) {
+    mejores[3] = masPequeno;
+  }
+
+  return mejores;
 }
 
 export default function Home() {
@@ -84,7 +95,6 @@ export default function Home() {
   const [usuario, setUsuario] = useState(null);
   const [mensaje, setMensaje] = useState("");
   const [pantalla, setPantalla] = useState("menu");
-
   const [opcionesMontaje, setOpcionesMontaje] = useState([]);
   const [montajeSeleccionado, setMontajeSeleccionado] = useState(null);
   const [resultados, setResultados] = useState([]);
@@ -136,8 +146,12 @@ export default function Home() {
     barniz_retiro: "",
     troquelado: false,
     repujado: false,
+    ventanilla: false,
+    largo_ventana: "",
+    ancho_ventana: "",
     pegue: "",
     envio: "",
+    costo_especial: "",
   });
 
   useEffect(() => {
@@ -204,8 +218,9 @@ export default function Home() {
       password,
     });
 
-    if (error) alert("Usuario o contraseña incorrectos");
-    else {
+    if (error) {
+      alert("Usuario o contraseña incorrectos");
+    } else {
       setUsuario(data.user);
       setPantalla("menu");
     }
@@ -261,205 +276,233 @@ export default function Home() {
     const ordenadas = [...catalogos.utilidades].sort((a, b) => {
       if (a.cantidad === null) return 1;
       if (b.cantidad === null) return -1;
-      return a.cantidad - b.cantidad;
+      return numero(a.cantidad) - numero(b.cantidad);
     });
 
-    const encontrada = ordenadas.find((u) => u.cantidad !== null && total <= numero(u.cantidad));
+    const encontrada = ordenadas.find(
+      (u) => u.cantidad !== null && total <= numero(u.cantidad)
+    );
+
     if (encontrada) return numero(encontrada.porcentaje);
 
     const final = ordenadas.find((u) => u.cantidad === null);
     return numero(final?.porcentaje || 0.4);
   }
 
-function calcularCotizacion(e) {
-  e.preventDefault();
+  function calcularCotizacion(e) {
+    e.preventDefault();
 
-  if (!montajeSeleccionado) {
-    alert("No hay montaje seleccionado.");
-    return;
-  }
-
-  const material = buscarPorId(catalogos.materiales, cotizacion.material_calibre);
-  const plasticoTiro = buscarPorId(catalogos.plasticos, cotizacion.plastico_tiro);
-  const plasticoRetiro = buscarPorId(catalogos.plasticos, cotizacion.plastico_retiro);
-  const barnizTiro = buscarPorId(catalogos.barnices, cotizacion.barniz_tiro);
-  const barnizRetiro = buscarPorId(catalogos.barnices, cotizacion.barniz_retiro);
-  const pegue = buscarPorId(catalogos.pegues, cotizacion.pegue);
-  const envio = buscarPorId(catalogos.envios, cotizacion.envio);
-
-  if (!material) {
-    alert("Selecciona material.");
-    return;
-  }
-
-  const areaCosteoM2 =
-    (montajeSeleccionado.rollo * montajeSeleccionado.largoHoja) / 10000;
-
-  const tintas = numero(cotizacion.tintas);
-
-  const cantidades = [1, 2, 3, 4, 5]
-    .map((n) => numero(cotizacion[`cantidad_${n}`]))
-    .filter((c) => c > 0);
-
-  const nuevosResultados = cantidades.map((cantidad, index) => {
-    const tirosBase = Math.ceil(cantidad / montajeSeleccionado.piezasPorHoja);
-
-    let sobrantes = 0;
-
-    if (tirosBase < 1000) {
-      sobrantes = 100;
-    } else if (tirosBase < 3000) {
-      sobrantes = Math.ceil(tirosBase * 0.10);
-    } else if (tirosBase > 3001) {
-      sobrantes = 300;
+    if (!montajeSeleccionado) {
+      alert("No hay montaje seleccionado.");
+      return;
     }
 
-    const tirosConSobrantes = tirosBase + sobrantes;
+    const material = buscarPorId(
+      catalogos.materiales,
+      cotizacion.material_calibre
+    );
+    const plasticoTiro = buscarPorId(
+      catalogos.plasticos,
+      cotizacion.plastico_tiro
+    );
+    const plasticoRetiro = buscarPorId(
+      catalogos.plasticos,
+      cotizacion.plastico_retiro
+    );
+    const barnizTiro = buscarPorId(
+      catalogos.barnices,
+      cotizacion.barniz_tiro
+    );
+    const barnizRetiro = buscarPorId(
+      catalogos.barnices,
+      cotizacion.barniz_retiro
+    );
+    const pegue = buscarPorId(catalogos.pegues, cotizacion.pegue);
+    const envio = buscarPorId(catalogos.envios, cotizacion.envio);
 
-    const papelBase =
-      areaCosteoM2 *
-      tirosConSobrantes *
-      numero(material.valor_pap_m2);
+    if (!material) {
+      alert("Selecciona material.");
+      return;
+    }
 
-    const papel = cotizacion.fv ? papelBase : papelBase * 1.19;
+    const areaCosteoM2 =
+      (montajeSeleccionado.rollo * montajeSeleccionado.largoHoja) / 10000;
 
-    const diseno = constante("DISEÑO");
+    const tintas = numero(cotizacion.tintas);
 
-    const ctp = constante("CTP") * tintas;
+    const cantidades = [1, 2, 3, 4, 5]
+      .map((n) => numero(cotizacion[`cantidad_${n}`]))
+      .filter((c) => c > 0);
 
-    const troquel = cotizacion.troquelado
-      ? constante("TROQUEL") * cantidad
-      : 0;
+    const nuevosResultados = cantidades.map((cantidad, index) => {
+      const tirosBase = Math.ceil(
+        cantidad / montajeSeleccionado.piezasPorHoja
+      );
 
-    const pesoKg =
-      (numero(material.peso_basico) * areaCosteoM2 * tirosConSobrantes) / 1000;
+      let sobrantes = 0;
 
-    const conversion =
-      constante("CUADRE DE CONVERSION") +
-      (pesoKg / 1000) * constante("CONVERSION X TON");
+      if (tirosBase < 1000) {
+        sobrantes = 100;
+      } else if (tirosBase < 3000) {
+        sobrantes = Math.ceil(tirosBase * 0.1);
+      } else if (tirosBase > 3001) {
+        sobrantes = 300;
+      }
 
-    const corte = constante("CORTE") * tirosBase;
+      const tirosConSobrantes = tirosBase + sobrantes;
 
-    const impresion =
-      constante("CUADRE DE IMPRESIÓN") +
-      (tirosBase < 1000
-        ? 1000 * tintas * constante("IMPRESIÓN")
-        : tirosBase * tintas * constante("IMPRESIÓN"));
+      const papelBase =
+        areaCosteoM2 * tirosConSobrantes * numero(material.valor_pap_m2);
 
-    const plastificadoTiro = plasticoTiro
-      ? areaCosteoM2 * tirosBase * numero(plasticoTiro.valor_plas_m2)
-      : 0;
+      const papel = cotizacion.fv ? papelBase : papelBase * 1.19;
 
-    const plastificadoRetiro = plasticoRetiro
-      ? areaCosteoM2 * tirosBase * numero(plasticoRetiro.valor_plas_m2)
-      : 0;
+      const diseno = constante("DISEÑO");
+      const ctp = constante("CTP") * tintas;
 
-    const barnizTiroCosto = barnizTiro
-      ? constante("CUADRE BARNIZ") +
-        areaCosteoM2 * tirosBase * numero(barnizTiro.valor_bar_m2)
-      : 0;
+      const troquel = cotizacion.troquelado
+        ? montajeSeleccionado.anchoMontaje *
+          montajeSeleccionado.largoMontaje *
+          constante("TROQUEL")
+        : 0;
 
-    const barnizRetiroCosto = barnizRetiro
-      ? constante("CUADRE BARNIZ") +
-        areaCosteoM2 * tirosBase * numero(barnizRetiro.valor_bar_m2)
-      : 0;
+      const pesoKg =
+        (numero(material.peso_basico) * areaCosteoM2 * tirosConSobrantes) /
+        1000;
 
-    const repujado = cotizacion.repujado
-      ? constante("CUADRE TROQUEL O REPUJE") + constante("CLISE REPUJE")
-      : 0;
+      const conversion =
+        constante("CUADRE DE CONVERSION") +
+        (pesoKg / 1000) * constante("CONVERSION X TON");
 
-    const troquelado = cotizacion.troquelado
-      ? constante("CUADRE TROQUEL O REPUJE") +
-        constante("MILLAR TROQUELADO") * cantidad
-      : 0;
+      const corte = constante("CORTE") * tirosBase;
 
-    const descartonado =
-      cotizacion.troquelado
+      const impresion =
+        constante("CUADRE DE IMPRESIÓN") +
+        (tirosBase < 1000
+          ? 1000 * tintas * constante("IMPRESIÓN")
+          : tirosBase * tintas * constante("IMPRESIÓN"));
+
+      const plastificadoTiro = plasticoTiro
+        ? areaCosteoM2 * tirosBase * numero(plasticoTiro.valor_plas_m2)
+        : 0;
+
+      const plastificadoRetiro = plasticoRetiro
+        ? areaCosteoM2 * tirosBase * numero(plasticoRetiro.valor_plas_m2)
+        : 0;
+
+      const barnizTiroCosto = barnizTiro
+        ? constante("CUADRE BARNIZ") +
+          areaCosteoM2 * tirosBase * numero(barnizTiro.valor_bar_m2)
+        : 0;
+
+      const barnizRetiroCosto = barnizRetiro
+        ? constante("CUADRE BARNIZ") +
+          areaCosteoM2 * tirosBase * numero(barnizRetiro.valor_bar_m2)
+        : 0;
+
+      const repujado = cotizacion.repujado
+        ? constante("CUADRE TROQUEL O REPUJE") +
+          areaCosteoM2 * constante("CLISE REPUJE") +
+          (tirosBase < 1000
+            ? constante("MILLAR TROQUELADO") * 1000
+            : tirosBase * constante("MILLAR TROQUELADO"))
+        : 0;
+
+      const troquelado = cotizacion.troquelado
+        ? constante("CUADRE TROQUEL O REPUJE") +
+          (tirosBase < 1000
+            ? constante("MILLAR TROQUELADO") * 1000
+            : tirosBase * constante("MILLAR TROQUELADO"))
+        : 0;
+
+      const descartonado = cotizacion.troquelado
         ? constante("DESCARTONE/UND") * cantidad
         : 0;
 
-    const ventanilla = 0;
+      const valorVentanilla =
+        ((numero(cotizacion.largo_ventana) *
+          numero(cotizacion.ancho_ventana)) /
+          10000) *
+        constante("COSTO VENTANA M2");
 
-    const pegueCosto = pegue
-      ? numero(pegue.cuadre_maquina) + numero(pegue.valor_peg_und) * cantidad
-      : 0;
+      const ventanilla = cotizacion.ventanilla
+        ? (constante("PEGUE DE VENTANILLA") + valorVentanilla) * cantidad
+        : 0;
 
-    const costoEspecial = 0;
+      const pegueCosto = pegue
+        ? numero(pegue.cuadre_maquina) + numero(pegue.valor_peg_und) * cantidad
+        : 0;
 
-    const empaque =
-      constante("FACTOR EMPAQUE") * cantidad * 1000;
+      const costoEspecial = numero(cotizacion.costo_especial) * cantidad;
 
-    const envioCosto = envio
-      ? pesoKg * numero(envio.valor_env_kg)
-      : 0;
+      const empaque = constante("FACTOR EMPAQUE") * cantidad * 1000;
 
-    const subtotalSinComision =
-      papel +
-      diseno +
-      ctp +
-      troquel +
-      conversion +
-      corte +
-      impresion +
-      plastificadoTiro +
-      plastificadoRetiro +
-      barnizTiroCosto +
-      barnizRetiroCosto +
-      repujado +
-      troquelado +
-      descartonado +
-      ventanilla +
-      pegueCosto +
-      costoEspecial +
-      empaque +
-      envioCosto;
+      const envioCosto = envio ? pesoKg * numero(envio.valor_env_kg) : 0;
 
-    const comision =
-      subtotalSinComision * constante("COMISION");
+      const subtotalSinComision =
+        papel +
+        diseno +
+        ctp +
+        troquel +
+        conversion +
+        corte +
+        impresion +
+        plastificadoTiro +
+        plastificadoRetiro +
+        barnizTiroCosto +
+        barnizRetiroCosto +
+        repujado +
+        troquelado +
+        descartonado +
+        ventanilla +
+        pegueCosto +
+        costoEspecial +
+        empaque +
+        envioCosto;
 
-    const total = subtotalSinComision + comision;
+      const comision = subtotalSinComision * constante("COMISION");
 
-    const gananciaPorcentaje = utilidadPorTotal(total);
-    const gananciaPesos = total * gananciaPorcentaje;
-    const totalTrabajo = total + gananciaPesos;
-    const valorUnitario = totalTrabajo / cantidad;
+      const total = subtotalSinComision + comision;
+      const gananciaPorcentaje = utilidadPorTotal(total);
+      const gananciaPesos = total * gananciaPorcentaje;
+      const totalTrabajo = total + gananciaPesos;
+      const valorUnitario = totalTrabajo / cantidad;
 
-    return {
-      nombre: `Cantidad ${index + 1}`,
-      cantidad,
-      tirosBase,
-      sobrantes,
-      tirosConSobrantes,
-      papel,
-      diseno,
-      ctp,
-      troquel,
-      conversion,
-      corte,
-      impresion,
-      plastificadoTiro,
-      plastificadoRetiro,
-      barnizTiroCosto,
-      barnizRetiroCosto,
-      repujado,
-      troquelado,
-      descartonado,
-      ventanilla,
-      pegueCosto,
-      costoEspecial,
-      empaque,
-      envioCosto,
-      comision,
-      total,
-      gananciaPorcentaje,
-      gananciaPesos,
-      totalTrabajo,
-      valorUnitario,
-    };
-  });
+      return {
+        nombre: `Cantidad ${index + 1}`,
+        cantidad,
+        tirosBase,
+        sobrantes,
+        tirosConSobrantes,
+        papel,
+        diseno,
+        ctp,
+        troquel,
+        conversion,
+        corte,
+        impresion,
+        plastificadoTiro,
+        plastificadoRetiro,
+        barnizTiroCosto,
+        barnizRetiroCosto,
+        repujado,
+        troquelado,
+        descartonado,
+        ventanilla,
+        pegueCosto,
+        costoEspecial,
+        empaque,
+        envioCosto,
+        comision,
+        total,
+        gananciaPorcentaje,
+        gananciaPesos,
+        totalTrabajo,
+        valorUnitario,
+      };
+    });
 
-  setResultados(nuevosResultados);
-}
+    setResultados(nuevosResultados);
+  }
 
   if (!usuario) {
     return (
@@ -501,12 +544,20 @@ function calcularCotizacion(e) {
           <h2>Menú principal</h2>
 
           <div style={{ display: "flex", gap: 20, marginTop: 20 }}>
-            <button onClick={() => setPantalla("clientes")} style={{ padding: 30, borderRadius: 12, fontSize: 18 }}>
-              👤<br />Crear Cliente
+            <button
+              onClick={() => setPantalla("clientes")}
+              style={{ padding: 30, borderRadius: 12, fontSize: 18 }}
+            >
+              👤<br />
+              Crear Cliente
             </button>
 
-            <button onClick={() => setPantalla("cotizar")} style={{ padding: 30, borderRadius: 12, fontSize: 18 }}>
-              🧾<br />Cotizar
+            <button
+              onClick={() => setPantalla("cotizar")}
+              style={{ padding: 30, borderRadius: 12, fontSize: 18 }}
+            >
+              🧾<br />
+              Cotizar
             </button>
           </div>
         </div>
@@ -522,7 +573,12 @@ function calcularCotizacion(e) {
               <div key={campo} style={{ marginBottom: 12 }}>
                 <label>{campo.replace("_", " ").toUpperCase()}</label>
                 <br />
-                <input name={campo} value={form[campo]} onChange={cambiar} style={{ width: "100%", padding: 10 }} />
+                <input
+                  name={campo}
+                  value={form[campo]}
+                  onChange={cambiar}
+                  style={{ width: "100%", padding: 10 }}
+                />
               </div>
             ))}
 
@@ -541,69 +597,147 @@ function calcularCotizacion(e) {
           <h2>Cotizador</h2>
 
           <form onSubmit={calcularCotizacion}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 20,
+              }}
+            >
               <div>
                 <label>CLIENTE *</label>
-                <select name="cliente" value={cotizacion.cliente} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }}>
+                <select
+                  name="cliente"
+                  value={cotizacion.cliente}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                >
                   <option value="">Seleccionar cliente</option>
                   {catalogos.clientes.map((c) => (
-                    <option key={c.id} value={c.id}>{c.razon_social}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.razon_social}
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>FV?</label>
-                <input type="checkbox" name="fv" checked={cotizacion.fv} onChange={cambiarCotizacion} style={{ marginLeft: 10 }} />
+                <input
+                  type="checkbox"
+                  name="fv"
+                  checked={cotizacion.fv}
+                  onChange={cambiarCotizacion}
+                  style={{ marginLeft: 10 }}
+                />
               </div>
 
               <div>
                 <label>LÍNEA *</label>
-                <select name="linea" value={cotizacion.linea} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }}>
+                <select
+                  name="linea"
+                  value={cotizacion.linea}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                >
                   <option value="">Seleccionar línea</option>
                   {catalogos.lineas.map((l) => (
-                    <option key={l.id} value={l.id}>{l.nombre}</option>
+                    <option key={l.id} value={l.id}>
+                      {l.nombre}
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>NOMBRE DEL PRODUCTO *</label>
-                <input name="nombre_producto" value={cotizacion.nombre_producto} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }} />
+                <input
+                  name="nombre_producto"
+                  value={cotizacion.nombre_producto}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                />
               </div>
 
               <div>
                 <label>LARGO ABIERTA *</label>
-                <input type="number" step="0.01" name="largo_abierta" value={cotizacion.largo_abierta} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }} />
+                <input
+                  type="number"
+                  step="0.01"
+                  name="largo_abierta"
+                  value={cotizacion.largo_abierta}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                />
               </div>
 
               <div>
                 <label>ANCHO ABIERTA *</label>
-                <input type="number" step="0.01" name="ancho_abierta" value={cotizacion.ancho_abierta} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }} />
+                <input
+                  type="number"
+                  step="0.01"
+                  name="ancho_abierta"
+                  value={cotizacion.ancho_abierta}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                />
               </div>
 
               <div>
                 <label>LARGO ARMADA</label>
-                <input type="number" step="0.01" name="largo_armada" value={cotizacion.largo_armada} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }} />
+                <input
+                  type="number"
+                  step="0.01"
+                  name="largo_armada"
+                  value={cotizacion.largo_armada}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                />
               </div>
 
               <div>
                 <label>ANCHO ARMADA</label>
-                <input type="number" step="0.01" name="ancho_armada" value={cotizacion.ancho_armada} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }} />
+                <input
+                  type="number"
+                  step="0.01"
+                  name="ancho_armada"
+                  value={cotizacion.ancho_armada}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                />
               </div>
 
               <div>
                 <label>ALTO ARMADA</label>
-                <input type="number" step="0.01" name="alto_armada" value={cotizacion.alto_armada} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }} />
+                <input
+                  type="number"
+                  step="0.01"
+                  name="alto_armada"
+                  value={cotizacion.alto_armada}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                />
               </div>
 
               <div>
                 <label>MATERIAL Y CALIBRE *</label>
-                <select name="material_calibre" value={cotizacion.material_calibre} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }}>
+                <select
+                  name="material_calibre"
+                  value={cotizacion.material_calibre}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                >
                   <option value="">Seleccionar material</option>
                   {catalogos.materiales.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.material} - Calibre {m.calibre} - {moneda(m.valor_pap_m2)}/m²
+                      {m.material} - Calibre {m.calibre} -{" "}
+                      {moneda(m.valor_pap_m2)}/m²
                     </option>
                   ))}
                 </select>
@@ -611,84 +745,206 @@ function calcularCotizacion(e) {
 
               {[1, 2, 3, 4, 5].map((n) => (
                 <div key={n}>
-                  <label>CANTIDAD {n}{n === 1 ? " *" : ""}</label>
-                  <input type="number" name={`cantidad_${n}`} value={cotizacion[`cantidad_${n}`]} onChange={cambiarCotizacion} required={n === 1} style={{ width: "100%", padding: 10 }} />
+                  <label>
+                    CANTIDAD {n}
+                    {n === 1 ? " *" : ""}
+                  </label>
+                  <input
+                    type="number"
+                    name={`cantidad_${n}`}
+                    value={cotizacion[`cantidad_${n}`]}
+                    onChange={cambiarCotizacion}
+                    required={n === 1}
+                    style={{ width: "100%", padding: 10 }}
+                  />
                 </div>
               ))}
 
               <div>
                 <label>TINTAS *</label>
-                <input type="number" name="tintas" value={cotizacion.tintas} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }} />
+                <input
+                  type="number"
+                  name="tintas"
+                  value={cotizacion.tintas}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                />
               </div>
 
               <div>
                 <label>PLÁSTICO TIRO</label>
-                <select name="plastico_tiro" value={cotizacion.plastico_tiro} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }}>
+                <select
+                  name="plastico_tiro"
+                  value={cotizacion.plastico_tiro}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                >
                   <option value="">Ninguno</option>
                   {catalogos.plasticos.map((p) => (
-                    <option key={p.id} value={p.id}>{p.ref} - {moneda(p.valor_plas_m2)}/m²</option>
+                    <option key={p.id} value={p.id}>
+                      {p.ref} - {moneda(p.valor_plas_m2)}/m²
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>PLÁSTICO RETIRO</label>
-                <select name="plastico_retiro" value={cotizacion.plastico_retiro} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }}>
+                <select
+                  name="plastico_retiro"
+                  value={cotizacion.plastico_retiro}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                >
                   <option value="">Ninguno</option>
                   {catalogos.plasticos.map((p) => (
-                    <option key={p.id} value={p.id}>{p.ref} - {moneda(p.valor_plas_m2)}/m²</option>
+                    <option key={p.id} value={p.id}>
+                      {p.ref} - {moneda(p.valor_plas_m2)}/m²
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>BARNIZ TIRO</label>
-                <select name="barniz_tiro" value={cotizacion.barniz_tiro} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }}>
+                <select
+                  name="barniz_tiro"
+                  value={cotizacion.barniz_tiro}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                >
                   <option value="">Ninguno</option>
                   {catalogos.barnices.map((b) => (
-                    <option key={b.id} value={b.id}>{b.ref} - {moneda(b.valor_bar_m2)}/m²</option>
+                    <option key={b.id} value={b.id}>
+                      {b.ref} - {moneda(b.valor_bar_m2)}/m²
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>BARNIZ RETIRO</label>
-                <select name="barniz_retiro" value={cotizacion.barniz_retiro} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }}>
+                <select
+                  name="barniz_retiro"
+                  value={cotizacion.barniz_retiro}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                >
                   <option value="">Ninguno</option>
                   {catalogos.barnices.map((b) => (
-                    <option key={b.id} value={b.id}>{b.ref} - {moneda(b.valor_bar_m2)}/m²</option>
+                    <option key={b.id} value={b.id}>
+                      {b.ref} - {moneda(b.valor_bar_m2)}/m²
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>TROQUELADO</label>
-                <input type="checkbox" name="troquelado" checked={cotizacion.troquelado} onChange={cambiarCotizacion} style={{ marginLeft: 10 }} />
+                <input
+                  type="checkbox"
+                  name="troquelado"
+                  checked={cotizacion.troquelado}
+                  onChange={cambiarCotizacion}
+                  style={{ marginLeft: 10 }}
+                />
               </div>
 
               <div>
                 <label>REPUJADO</label>
-                <input type="checkbox" name="repujado" checked={cotizacion.repujado} onChange={cambiarCotizacion} style={{ marginLeft: 10 }} />
+                <input
+                  type="checkbox"
+                  name="repujado"
+                  checked={cotizacion.repujado}
+                  onChange={cambiarCotizacion}
+                  style={{ marginLeft: 10 }}
+                />
               </div>
 
               <div>
+                <label>VENTANILLA</label>
+                <input
+                  type="checkbox"
+                  name="ventanilla"
+                  checked={cotizacion.ventanilla}
+                  onChange={cambiarCotizacion}
+                  style={{ marginLeft: 10 }}
+                />
+              </div>
+
+              {cotizacion.ventanilla && (
+                <>
+                  <div>
+                    <label>LARGO VENTANA</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      name="largo_ventana"
+                      value={cotizacion.largo_ventana}
+                      onChange={cambiarCotizacion}
+                      style={{ width: "100%", padding: 10 }}
+                    />
+                  </div>
+
+                  <div>
+                    <label>ANCHO VENTANA</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      name="ancho_ventana"
+                      value={cotizacion.ancho_ventana}
+                      onChange={cambiarCotizacion}
+                      style={{ width: "100%", padding: 10 }}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div>
                 <label>PEGUE</label>
-                <select name="pegue" value={cotizacion.pegue} onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }}>
+                <select
+                  name="pegue"
+                  value={cotizacion.pegue}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                >
                   <option value="">Ninguno</option>
                   {catalogos.pegues.map((p) => (
-                    <option key={p.id} value={p.id}>{p.ref} - {moneda(p.valor_peg_und)}/und</option>
+                    <option key={p.id} value={p.id}>
+                      {p.ref} - {moneda(p.valor_peg_und)}/und
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <label>ENVÍO *</label>
-                <select name="envio" value={cotizacion.envio} onChange={cambiarCotizacion} required style={{ width: "100%", padding: 10 }}>
+                <select
+                  name="envio"
+                  value={cotizacion.envio}
+                  onChange={cambiarCotizacion}
+                  required
+                  style={{ width: "100%", padding: 10 }}
+                >
                   <option value="">Seleccionar envío</option>
                   {catalogos.envios.map((e) => (
-                    <option key={e.id} value={e.id}>{e.ref} - {moneda(e.valor_env_kg)}/kg</option>
+                    <option key={e.id} value={e.id}>
+                      {e.ref} - {moneda(e.valor_env_kg)}/kg
+                    </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label>COSTO ESPECIAL $/UND</label>
+                <input
+                  type="number"
+                  name="costo_especial"
+                  value={cotizacion.costo_especial}
+                  onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}
+                />
               </div>
             </div>
 
@@ -696,29 +952,68 @@ function calcularCotizacion(e) {
               <div style={{ marginTop: 30 }}>
                 <h3>Opciones de montaje sugeridas</h3>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 20,
+                  }}
+                >
                   {opcionesMontaje.map((opcion, index) => (
                     <div
                       key={opcion.id}
                       onClick={() => setMontajeSeleccionado(opcion)}
                       style={{
                         padding: 20,
-                        border: montajeSeleccionado?.id === opcion.id ? "3px solid #111" : "1px solid #ccc",
+                        border:
+                          montajeSeleccionado?.id === opcion.id
+                            ? "3px solid #111"
+                            : "1px solid #ccc",
                         borderRadius: 12,
                         cursor: "pointer",
-                        background: montajeSeleccionado?.id === opcion.id ? "#f1f1f1" : "white",
+                        background:
+                          montajeSeleccionado?.id === opcion.id
+                            ? "#f1f1f1"
+                            : "white",
                       }}
                     >
                       <h4>Opción {index + 1}</h4>
-                      <p><strong>Orientación:</strong> {opcion.orientacion}</p>
-                      <p><strong>Montaje:</strong> {opcion.columnas} columnas x {opcion.filas} filas</p>
-                      <p><strong>Piezas por hoja:</strong> {opcion.piezasPorHoja}</p>
-                      <p><strong>Medida montaje:</strong> {opcion.anchoMontaje.toFixed(2)} x {opcion.largoMontaje.toFixed(2)} cm</p>
-                      <p><strong>Medida hoja:</strong> {opcion.anchoHoja.toFixed(2)} x {opcion.largoHoja.toFixed(2)} cm</p>
-                      <p><strong>Rollo:</strong> {opcion.rollo} cm</p>
-                      <p><strong>Desperdicio ancho:</strong> {opcion.desperdicioAncho.toFixed(2)} cm</p>
-                      <p><strong>Aprovechamiento:</strong> {opcion.aprovechamiento.toFixed(2)}%</p>
-                      {montajeSeleccionado?.id === opcion.id && <strong>✅ Montaje seleccionado</strong>}
+                      <p>
+                        <strong>Orientación:</strong> {opcion.orientacion}
+                      </p>
+                      <p>
+                        <strong>Montaje:</strong> {opcion.columnas} columnas x{" "}
+                        {opcion.filas} filas
+                      </p>
+                      <p>
+                        <strong>Piezas por hoja:</strong>{" "}
+                        {opcion.piezasPorHoja}
+                      </p>
+                      <p>
+                        <strong>Medida montaje:</strong>{" "}
+                        {opcion.anchoMontaje.toFixed(2)} x{" "}
+                        {opcion.largoMontaje.toFixed(2)} cm
+                      </p>
+                      <p>
+                        <strong>Medida hoja:</strong>{" "}
+                        {opcion.anchoHoja.toFixed(2)} x{" "}
+                        {opcion.largoHoja.toFixed(2)} cm
+                      </p>
+                      <p>
+                        <strong>Rollo:</strong> {opcion.rollo} cm
+                      </p>
+                      <p>
+                        <strong>Desperdicio ancho:</strong>{" "}
+                        {opcion.desperdicioAncho.toFixed(2)} cm
+                      </p>
+                      <p>
+                        <strong>Aprovechamiento:</strong>{" "}
+                        {opcion.aprovechamiento.toFixed(2)}%
+                      </p>
+
+                      {montajeSeleccionado?.id === opcion.id && (
+                        <strong>✅ Montaje seleccionado</strong>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -726,7 +1021,14 @@ function calcularCotizacion(e) {
             )}
 
             <div style={{ marginTop: 30 }}>
-              <button type="submit" style={{ padding: "15px 30px", fontSize: 18, borderRadius: 10 }}>
+              <button
+                type="submit"
+                style={{
+                  padding: "15px 30px",
+                  fontSize: 18,
+                  borderRadius: 10,
+                }}
+              >
                 CALCULAR COTIZACIÓN
               </button>
             </div>
@@ -737,17 +1039,29 @@ function calcularCotizacion(e) {
               <h2>Resultado de cotización</h2>
 
               <div style={{ overflowX: "auto" }}>
-                <table border="1" cellPadding="8" style={{ borderCollapse: "collapse", width: "100%" }}>
+                <table
+                  border="1"
+                  cellPadding="8"
+                  style={{ borderCollapse: "collapse", width: "100%" }}
+                >
                   <thead>
                     <tr>
                       <th>Fase</th>
                       {resultados.map((r) => (
-                        <th key={r.nombre}>{r.nombre}<br />{r.cantidad} und</th>
+                        <th key={r.nombre}>
+                          {r.nombre}
+                          <br />
+                          {r.cantidad} und
+                        </th>
                       ))}
                     </tr>
                   </thead>
+
                   <tbody>
                     {[
+                      ["TIROS BASE", "tirosBase"],
+                      ["SOBRANTES", "sobrantes"],
+                      ["TIROS TOTALES", "tirosConSobrantes"],
                       ["PAPEL", "papel"],
                       ["DISEÑO", "diseno"],
                       ["CTP", "ctp"],
@@ -771,38 +1085,62 @@ function calcularCotizacion(e) {
                       ["TOTAL", "total"],
                     ].map(([label, key]) => (
                       <tr key={key}>
-                        <td><strong>{label}</strong></td>
+                        <td>
+                          <strong>{label}</strong>
+                        </td>
                         {resultados.map((r) => (
-                          <td key={r.nombre + key}>{moneda(r[key])}</td>
+                          <td key={r.nombre + key}>
+                            {["tirosBase", "sobrantes", "tirosConSobrantes"].includes(
+                              key
+                            )
+                              ? r[key]
+                              : moneda(r[key])}
+                          </td>
                         ))}
                       </tr>
                     ))}
 
                     <tr>
-                      <td><strong>GANANCIA %</strong></td>
+                      <td>
+                        <strong>GANANCIA %</strong>
+                      </td>
                       {resultados.map((r) => (
-                        <td key={r.nombre + "gananciaPorcentaje"}>{(r.gananciaPorcentaje * 100).toFixed(0)}%</td>
+                        <td key={r.nombre + "gananciaPorcentaje"}>
+                          {(r.gananciaPorcentaje * 100).toFixed(0)}%
+                        </td>
                       ))}
                     </tr>
 
                     <tr>
-                      <td><strong>GANANCIA $</strong></td>
+                      <td>
+                        <strong>GANANCIA $</strong>
+                      </td>
                       {resultados.map((r) => (
-                        <td key={r.nombre + "gananciaPesos"}>{moneda(r.gananciaPesos)}</td>
+                        <td key={r.nombre + "gananciaPesos"}>
+                          {moneda(r.gananciaPesos)}
+                        </td>
                       ))}
                     </tr>
 
                     <tr>
-                      <td><strong>TOTAL TRABAJO</strong></td>
+                      <td>
+                        <strong>TOTAL TRABAJO</strong>
+                      </td>
                       {resultados.map((r) => (
-                        <td key={r.nombre + "totalTrabajo"}>{moneda(r.totalTrabajo)}</td>
+                        <td key={r.nombre + "totalTrabajo"}>
+                          {moneda(r.totalTrabajo)}
+                        </td>
                       ))}
                     </tr>
 
                     <tr>
-                      <td><strong>VALOR UNITARIO</strong></td>
+                      <td>
+                        <strong>VALOR UNITARIO</strong>
+                      </td>
                       {resultados.map((r) => (
-                        <td key={r.nombre + "valorUnitario"}><strong>{moneda(r.valorUnitario)}</strong></td>
+                        <td key={r.nombre + "valorUnitario"}>
+                          <strong>{moneda(r.valorUnitario)}</strong>
+                        </td>
                       ))}
                     </tr>
                   </tbody>
