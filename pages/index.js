@@ -527,6 +527,24 @@ export default function Home() {
           />
 
           <button type="submit">Ingresar</button>
+
+<div style={{ marginTop: 20 }}>
+  <button
+    type="button"
+    onClick={recuperarPassword}
+    style={{
+      background: "none",
+      border: "none",
+      color: "#0066cc",
+      textDecoration: "underline",
+      cursor: "pointer",
+      padding: 0,
+      fontSize: 14,
+    }}
+  >
+    ¿Olvidaste tu contraseña?
+  </button>
+</div>
         </form>
       </main>
     );
