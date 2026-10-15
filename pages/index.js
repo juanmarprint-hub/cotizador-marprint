@@ -529,7 +529,21 @@ async function recuperarPassword() {
 
   if (!usuario) {
     return (
-      <main style={{ padding: 40, fontFamily: "Arial" }}>
+      <main className="marprint mp-login">
+<style>{`
+ .marprint{--blue:#2563eb;--navy:#132b4d;box-sizing:border-box;color:#233650;font-family:Arial,sans-serif;background:#f3f6fb;min-height:100vh;padding:32px!important;max-width:none!important}
+ .marprint *{box-sizing:border-box}.marprint h1{color:var(--navy);letter-spacing:-1px;margin:0 0 12px}.marprint h2{font-size:23px}.marprint p{line-height:1.6}.marprint label{font-size:12px;font-weight:700;color:#53647b;display:block;margin-bottom:8px}
+ .marprint input:not([type=checkbox]),.marprint select{width:100%;padding:12px!important;background:#fff;border:1px solid #cfdae8;border-radius:9px;font-size:15px;color:#1e3553;min-height:45px}.marprint input:focus,.marprint select:focus{outline:3px solid #bfdbfe;border-color:var(--blue)}
+ .marprint button{border:1px solid #d4deec;background:white;color:var(--navy);border-radius:10px;padding:12px 18px;cursor:pointer;font-weight:700}.marprint button:hover{border-color:var(--blue);background:#eff6ff}.marprint button[type=submit]{background:var(--blue);color:white;border-color:var(--blue)}
+ .marprint input[type=checkbox]{appearance:none;width:42px;height:24px;background:#cbd5e1;border-radius:20px;vertical-align:middle;position:relative;cursor:pointer}.marprint input[type=checkbox]:after{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:white;border-radius:50%;transition:transform .15s}.marprint input[type=checkbox]:checked{background:var(--blue)}.marprint input[type=checkbox]:checked:after{transform:translateX(18px)}.marprint input[type=checkbox]:focus-visible{outline:3px solid #93c5fd}
+ .mp-card{border:1px solid #e0e7f0;border-radius:18px;background:#fff;padding:26px;margin:22px 0;box-shadow:0 5px 20px #132b4d08}.mp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}.mp-card h3{grid-column:1/-1;margin:0 0 6px;color:#132b4d;font-size:18px}.mp-card h3 small{display:block;font-size:13px;font-weight:400;color:#687991;margin-top:8px}.mp-quantities{grid-template-columns:repeat(5,minmax(0,1fr))}
+ .mp-nav{display:flex;flex-direction:column;gap:12px;position:fixed;left:0;top:0;bottom:0;width:220px;padding:30px 20px;background:#132b4d;color:white}.mp-nav strong{font-size:24px;margin-bottom:28px}.mp-nav button{text-align:left;background:#ffffff0d;color:white;border-color:#ffffff20}.mp-nav button[aria-current=page]{background:#2563eb}.mp-app{padding-left:250px!important}.mp-content{max-width:1250px;margin:auto}.mp-login{display:grid;place-items:center;background:linear-gradient(135deg,#10233f,#205aba)}.mp-login-card{background:white;border-radius:22px;padding:36px;width:min(100%,440px);box-shadow:0 20px 60px #0003}.mp-login-card h1{font-size:27px}.mp-login-card form>button[type=submit]{width:100%;margin-top:12px}
+ .mp-montage{width:100%;text-align:left!important;display:block}.mp-montage[aria-pressed=true]{border-color:#2563eb!important;background:#eff6ff!important}.mp-sheet{display:grid;gap:3px;background:#dce6f2;border:1px solid #b6c7db;padding:8px;margin:18px auto;max-width:100%;width:220px}.mp-piece{display:block;background:#79a9f5;border:1px solid #3979d8;border-radius:2px;min-height:5px}.mp-badge{display:inline-block;background:#dcfce7;color:#166534;padding:5px 9px;border-radius:20px;font-size:12px}.marprint table{border:0!important;background:white;font-size:13px}.marprint td,.marprint th{padding:13px!important;border:0;border-bottom:1px solid #e5ebf3;white-space:nowrap}.marprint th{background:#132b4d;color:white;position:sticky;top:0}.marprint td:not(:first-child){text-align:right}.marprint tbody tr:nth-child(even){background:#f8fafc}.marprint tbody tr:last-child{background:#e6efff;color:#1749a2;font-size:17px}.mp-table{max-height:650px;overflow:auto;border-radius:12px}.mp-menu{display:flex;gap:20px;flex-wrap:wrap}.mp-menu button{flex:1;min-width:200px;background:white;box-shadow:0 5px 20px #132b4d08;border:1px solid #e0e7f0;padding:40px!important}
+ @media(max-width:1000px){.mp-nav{position:static;width:auto;flex-direction:row;flex-wrap:wrap;border-radius:14px;margin-bottom:24px;padding:18px}.mp-nav strong{margin:0 18px 0 0;align-self:center}.mp-app{padding:20px!important}.mp-quantities{grid-template-columns:repeat(3,minmax(0,1fr))}}
+ @media(max-width:600px){.marprint{padding:16px!important}.mp-grid,.mp-quantities{grid-template-columns:1fr!important}.mp-card{padding:18px}.mp-login-card{padding:26px}.mp-nav strong{width:100%}}
+`}</style>
+<div className="mp-login-card">
+<p>MARPRINT · Cotizaciones industriales</p>
         <h1>Ingreso vendedores</h1>
 
         <form onSubmit={login}>
@@ -569,12 +583,26 @@ async function recuperarPassword() {
   </button>
 </div>
         </form>
-      </main>
+      </div></main>
     );
   }
 
   return (
-    <main style={{ padding: 40, fontFamily: "Arial", maxWidth: 1200 }}>
+    <main className="marprint mp-app">
+<style>{`
+ .marprint{--blue:#2563eb;--navy:#132b4d;box-sizing:border-box;color:#233650;font-family:Arial,sans-serif;background:#f3f6fb;min-height:100vh;padding:32px!important;max-width:none!important}
+ .marprint *{box-sizing:border-box}.marprint h1{color:var(--navy);letter-spacing:-1px;margin:0 0 12px}.marprint h2{font-size:23px}.marprint p{line-height:1.6}.marprint label{font-size:12px;font-weight:700;color:#53647b;display:block;margin-bottom:8px}
+ .marprint input:not([type=checkbox]),.marprint select{width:100%;padding:12px!important;background:#fff;border:1px solid #cfdae8;border-radius:9px;font-size:15px;color:#1e3553;min-height:45px}.marprint input:focus,.marprint select:focus{outline:3px solid #bfdbfe;border-color:var(--blue)}
+ .marprint button{border:1px solid #d4deec;background:white;color:var(--navy);border-radius:10px;padding:12px 18px;cursor:pointer;font-weight:700}.marprint button:hover{border-color:var(--blue);background:#eff6ff}.marprint button[type=submit]{background:var(--blue);color:white;border-color:var(--blue)}
+ .marprint input[type=checkbox]{appearance:none;width:42px;height:24px;background:#cbd5e1;border-radius:20px;vertical-align:middle;position:relative;cursor:pointer}.marprint input[type=checkbox]:after{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:white;border-radius:50%;transition:transform .15s}.marprint input[type=checkbox]:checked{background:var(--blue)}.marprint input[type=checkbox]:checked:after{transform:translateX(18px)}.marprint input[type=checkbox]:focus-visible{outline:3px solid #93c5fd}
+ .mp-card{border:1px solid #e0e7f0;border-radius:18px;background:#fff;padding:26px;margin:22px 0;box-shadow:0 5px 20px #132b4d08}.mp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}.mp-card h3{grid-column:1/-1;margin:0 0 6px;color:#132b4d;font-size:18px}.mp-card h3 small{display:block;font-size:13px;font-weight:400;color:#687991;margin-top:8px}.mp-quantities{grid-template-columns:repeat(5,minmax(0,1fr))}
+ .mp-nav{display:flex;flex-direction:column;gap:12px;position:fixed;left:0;top:0;bottom:0;width:220px;padding:30px 20px;background:#132b4d;color:white}.mp-nav strong{font-size:24px;margin-bottom:28px}.mp-nav button{text-align:left;background:#ffffff0d;color:white;border-color:#ffffff20}.mp-nav button[aria-current=page]{background:#2563eb}.mp-app{padding-left:250px!important}.mp-content{max-width:1250px;margin:auto}.mp-login{display:grid;place-items:center;background:linear-gradient(135deg,#10233f,#205aba)}.mp-login-card{background:white;border-radius:22px;padding:36px;width:min(100%,440px);box-shadow:0 20px 60px #0003}.mp-login-card h1{font-size:27px}.mp-login-card form>button[type=submit]{width:100%;margin-top:12px}
+ .mp-montage{width:100%;text-align:left!important;display:block}.mp-montage[aria-pressed=true]{border-color:#2563eb!important;background:#eff6ff!important}.mp-sheet{display:grid;gap:3px;background:#dce6f2;border:1px solid #b6c7db;padding:8px;margin:18px auto;max-width:100%;width:220px}.mp-piece{display:block;background:#79a9f5;border:1px solid #3979d8;border-radius:2px;min-height:5px}.mp-badge{display:inline-block;background:#dcfce7;color:#166534;padding:5px 9px;border-radius:20px;font-size:12px}.marprint table{border:0!important;background:white;font-size:13px}.marprint td,.marprint th{padding:13px!important;border:0;border-bottom:1px solid #e5ebf3;white-space:nowrap}.marprint th{background:#132b4d;color:white;position:sticky;top:0}.marprint td:not(:first-child){text-align:right}.marprint tbody tr:nth-child(even){background:#f8fafc}.marprint tbody tr:last-child{background:#e6efff;color:#1749a2;font-size:17px}.mp-table{max-height:650px;overflow:auto;border-radius:12px}.mp-menu{display:flex;gap:20px;flex-wrap:wrap}.mp-menu button{flex:1;min-width:200px;background:white;box-shadow:0 5px 20px #132b4d08;border:1px solid #e0e7f0;padding:40px!important}
+ @media(max-width:1000px){.mp-nav{position:static;width:auto;flex-direction:row;flex-wrap:wrap;border-radius:14px;margin-bottom:24px;padding:18px}.mp-nav strong{margin:0 18px 0 0;align-self:center}.mp-app{padding:20px!important}.mp-quantities{grid-template-columns:repeat(3,minmax(0,1fr))}}
+ @media(max-width:600px){.marprint{padding:16px!important}.mp-grid,.mp-quantities{grid-template-columns:1fr!important}.mp-card{padding:18px}.mp-login-card{padding:26px}.mp-nav strong{width:100%}}
+`}</style>
+<nav className="mp-nav" aria-label="Navegación principal"><strong>Marprint</strong>{[["menu","Inicio"],["clientes","Clientes"],["cotizar","Cotizaciones"]].map(([id,label])=>(<button type="button" key={id} aria-current={pantalla===id ? "page" : undefined} onClick={()=>setPantalla(id)}>{label}</button>))}</nav>
+<div className="mp-content">
       <h1>Cotizador Marprint</h1>
       <p>Usuario: {usuario.email}</p>
 
@@ -584,7 +612,7 @@ async function recuperarPassword() {
         <div>
           <h2>Menú principal</h2>
 
-          <div style={{ display: "flex", gap: 20, marginTop: 20 }}>
+          <div className="mp-menu">
             <button
               onClick={() => setPantalla("clientes")}
               style={{ padding: 30, borderRadius: 12, fontSize: 18 }}
@@ -609,7 +637,7 @@ async function recuperarPassword() {
           <button onClick={() => setPantalla("menu")}>← Volver</button>
           <h2>Crear cliente</h2>
 
-          <form onSubmit={guardarCliente}>
+          <form onSubmit={guardarCliente} className="mp-card mp-grid">
             {Object.keys(form).map((campo) => (
               <div key={campo} style={{ marginBottom: 12 }}>
                 <label>{campo.replace("_", " ").toUpperCase()}</label>
@@ -638,13 +666,7 @@ async function recuperarPassword() {
           <h2>Cotizador</h2>
 
           <form onSubmit={calcularCotizacion}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 20,
-              }}
-            >
+            <div className="mp-card mp-grid"><h3>01 · Información general<small>Selecciona el cliente y describe el producto.</small></h3>
               <div>
                 <label>CLIENTE *</label>
                 <select
@@ -703,6 +725,7 @@ async function recuperarPassword() {
                 />
               </div>
 
+</div><div className="mp-card mp-grid "><h3>02 · Especificaciones del producto<small>Dimensiones en centímetros (cm).</small></h3>
               <div>
                 <label>LARGO ABIERTA *</label>
                 <input
@@ -784,6 +807,7 @@ async function recuperarPassword() {
                 </select>
               </div>
 
+</div><div className="mp-card mp-grid mp-quantities"><h3>03 · Cantidades<small>Compara hasta cinco volúmenes de producción.</small></h3>
               {[1, 2, 3, 4, 5].map((n) => (
                 <div key={n}>
                   <label>
@@ -801,6 +825,7 @@ async function recuperarPassword() {
                 </div>
               ))}
 
+</div><div className="mp-card mp-grid "><h3>04 · Procesos de fabricación<small>Configura impresión, acabados y pegue.</small></h3>
               <div>
                 <label>TINTAS *</label>
                 <input
@@ -959,6 +984,7 @@ async function recuperarPassword() {
                 </select>
               </div>
 
+</div><div className="mp-card mp-grid "><h3>05 · Costos adicionales<small>Selecciona el envío y los costos especiales por unidad.</small></h3>
               <div>
                 <label>ENVÍO *</label>
                 <select
@@ -990,18 +1016,15 @@ async function recuperarPassword() {
             </div>
 
             {opcionesMontaje.length > 0 && (
-              <div style={{ marginTop: 30 }}>
-                <h3>Opciones de montaje sugeridas</h3>
+              <div className="mp-card">
+                <h3>06 · Montajes sugeridos</h3><p>Selecciona una alternativa. El montaje mínimo se identifica entre las opciones sugeridas.</p>
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 20,
-                  }}
-                >
+                <div className="mp-grid">
                   {opcionesMontaje.map((opcion, index) => (
-                    <div
+                    <button
+                      type="button"
+                      className="mp-montage"
+                      aria-pressed={montajeSeleccionado?.id === opcion.id}
                       key={opcion.id}
                       onClick={() => setMontajeSeleccionado(opcion)}
                       style={{
@@ -1019,6 +1042,8 @@ async function recuperarPassword() {
                       }}
                     >
                       <h4>Opción {index + 1}</h4>
+{opcion.id === [...opcionesMontaje].sort((a,b)=>a.anchoHoja*a.largoHoja-b.anchoHoja*b.largoHoja)[0]?.id && <span className="mp-badge">Montaje mínimo</span>}
+<span aria-label={opcion.columnas + ' columnas por ' + opcion.filas + ' filas'} className="mp-sheet" style={{gridTemplateColumns:'repeat('+opcion.columnas+',1fr)',aspectRatio:opcion.anchoHoja+'/'+opcion.largoHoja}}>{Array.from({length:opcion.piezasPorHoja},(_,i)=><span className="mp-piece" key={i}/>)}</span>
                       <p>
                         <strong>Orientación:</strong> {opcion.orientacion}
                       </p>
@@ -1055,7 +1080,7 @@ async function recuperarPassword() {
                       {montajeSeleccionado?.id === opcion.id && (
                         <strong>✅ Montaje seleccionado</strong>
                       )}
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -1076,10 +1101,10 @@ async function recuperarPassword() {
           </form>
 
           {resultados.length > 0 && (
-            <div style={{ marginTop: 40 }}>
+            <div className="mp-card">
               <h2>Resultado de cotización</h2>
 
-              <div style={{ overflowX: "auto" }}>
+              <div className="mp-table">
                 <table
                   border="1"
                   cellPadding="8"
@@ -1191,6 +1216,6 @@ async function recuperarPassword() {
           )}
         </div>
       )}
-    </main>
+    </div></main>
   );
 }
