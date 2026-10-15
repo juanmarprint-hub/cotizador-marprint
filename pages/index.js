@@ -209,7 +209,30 @@ export default function Home() {
 
     setResultados([]);
   }, [cotizacion.largo_abierta, cotizacion.ancho_abierta]);
+async function recuperarPassword() {
+  const correo = email.trim();
 
+  if (!correo) {
+    alert("Primero escribe tu correo electrónico.");
+    return;
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    correo,
+    {
+      redirectTo:
+        "https://cotizador-marprint.vercel.app/restablecer",
+    }
+  );
+
+  if (error) {
+    alert("Error: " + error.message);
+  } else {
+    alert(
+      "Si el correo está registrado, recibirás un enlace para restablecer tu contraseña. Revisa también Spam."
+    );
+  }
+}
   async function login(e) {
     e.preventDefault();
 
