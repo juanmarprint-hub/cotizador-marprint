@@ -473,17 +473,24 @@ async function recuperarPassword() {
           modoEdicion === "clonar" ? "Clonada de otra cotización" : "Cotización inicial",
         p_origen_id: modoEdicion === "clonar" ? cotizacionOriginal : null,
       });
-      if (error) throw error;
-      
-      console.log("RESPUESTA SUPABASE:", data);
-      
-      setCotizacionId(data.id);
-      setNumeroCotizacion(data.numero);
-      setVersionCotizacion(data.version);
-      setModoEdicion("actualizar");
-      setCotizacionOriginal(null);
-      setMotivoActualizacion("");
-      await cargarVersiones(data.id);
+     if (error) throw error;
+
+// La función de Supabase devuelve una tabla de resultados.
+const guardada = Array.isArray(data) ? data[0] : data;
+
+// Verificar que Supabase haya devuelto un identificador válido.
+if (!guardada?.id) {
+  throw new Error("La cotización se guardó, pero no se recibió su identificador.");
+}
+
+setCotizacionId(guardada.id);
+setNumeroCotizacion(guardada.numero);
+setVersionCotizacion(guardada.version);
+setModoEdicion("actualizar");
+setCotizacionOriginal(null);
+setMotivoActualizacion("");
+
+await cargarVersiones(guardada.id);
       alert(`Cotización ${data.numero} guardada correctamente (versión ${data.version}).`);
     } catch (e) { alert("No se pudo guardar: " + e.message); }
     finally { setOcupado(false); }
