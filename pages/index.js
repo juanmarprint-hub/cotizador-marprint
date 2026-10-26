@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -90,6 +90,8 @@ function obtenerMejoresMontajes(largoCaja, anchoCaja) {
 }
 
 export default function Home() {
+  const cargandoVersion = useRef(false);
+  const montajeCargado = useRef(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [usuario, setUsuario] = useState(null);
@@ -98,6 +100,20 @@ export default function Home() {
   const [opcionesMontaje, setOpcionesMontaje] = useState([]);
   const [montajeSeleccionado, setMontajeSeleccionado] = useState(null);
   const [resultados, setResultados] = useState([]);
+  const [calculoVigente, setCalculoVigente] = useState(false);
+  const [cotizacionId, setCotizacionId] = useState(null);
+  const [numeroCotizacion, setNumeroCotizacion] = useState("");
+  const [versionCotizacion, setVersionCotizacion] = useState(0);
+  const [cotizacionesGuardadas, setCotizacionesGuardadas] = useState([]);
+  const [busqueda, setBusqueda] = useState("");
+  const [historial, setHistorial] = useState([]);
+  const [cotizacionOriginal, setCotizacionOriginal] = useState(null);
+  const [imagenes, setImagenes] = useState([]);
+  const [imagenesVista, setImagenesVista] = useState({});
+  const [ocupado, setOcupado] = useState(false);
+  const [motivoActualizacion, setMotivoActualizacion] = useState("");
+  const [modoEdicion, setModoEdicion] = useState("nueva");
+  const [verHistorial, setVerHistorial] = useState(false);
 
   const [catalogos, setCatalogos] = useState({
     clientes: [],
@@ -152,7 +168,22 @@ export default function Home() {
     pegue: "",
     envio: "",
     costo_especial: "",
+    observacion_costo_especial: "",
   });
+
+  useEffect(() => {
+    let activo = true;
+    async function cargarVistas() {
+      const entradas = await Promise.all(imagenes.map(async (path) => {
+        const { data } = await supabase.storage.from("referencias-cotizaciones")
+          .createSignedUrl(path, 3600);
+        return [path, data?.signedUrl || ""];
+      }));
+      if (activo) setImagenesVista(Object.fromEntries(entradas));
+    }
+    cargarVistas();
+    return () => { activo = false; };
+  }, [imagenes]);
 
   useEffect(() => {
     async function cargarCatalogos() {
@@ -201,13 +232,18 @@ export default function Home() {
     if (largo > 0 && ancho > 0) {
       const opciones = obtenerMejoresMontajes(largo, ancho);
       setOpcionesMontaje(opciones);
-      setMontajeSeleccionado(opciones[0] || null);
+      setMontajeSeleccionado(prev => {
+        const guardado = montajeCargado.current;
+        montajeCargado.current = null;
+        return guardado || opciones.find(o => o.id === prev?.id) || opciones[0] || null;
+      });
     } else {
       setOpcionesMontaje([]);
       setMontajeSeleccionado(null);
     }
 
-    setResultados([]);
+    if (cargandoVersion.current) { cargandoVersion.current = false; }
+    else { setResultados([]); setCalculoVigente(false); }
   }, [cotizacion.largo_abierta, cotizacion.ancho_abierta]);
 async function recuperarPassword() {
   const correo = email.trim();
@@ -260,6 +296,7 @@ async function recuperarPassword() {
       [name]: type === "checkbox" ? checked : value,
     });
     setResultados([]);
+    setCalculoVigente(false);
   }
 
   async function guardarCliente(e) {
@@ -310,6 +347,127 @@ async function recuperarPassword() {
 
     const final = ordenadas.find((u) => u.cantidad === null);
     return numero(final?.porcentaje || 0.4);
+  }
+
+  async function cargarCotizaciones() {
+    const { data, error } = await supabase.from("marprint_cotizaciones")
+      .select("id,numero,cliente_id,producto,version_actual,origen_id,created_at,updated_at")
+      .order("updated_at", { ascending: false }).limit(500);
+    if (error) { alert("No se pudo consultar el historial: " + error.message); return; }
+    setCotizacionesGuardadas(data || []);
+  }
+
+  function nuevaCotizacion() {
+    setCotizacionId(null);
+    setNumeroCotizacion("");
+    setVersionCotizacion(0);
+    setCotizacionOriginal(null);
+    setModoEdicion("nueva");
+    setMotivoActualizacion("");
+    setCotizacion((prev) => Object.fromEntries(Object.keys(prev).map(k =>
+      [k, typeof prev[k] === "boolean" ? false : ""])));
+    setResultados([]);
+    setCalculoVigente(false);
+    setImagenes([]);
+    setHistorial([]);
+    setVerHistorial(false);
+    setPantalla("cotizar");
+  }
+
+  async function cargarVersiones(id) {
+    const { data, error } = await supabase.from("marprint_versiones")
+      .select("id,version,motivo,datos,montaje,resultados,imagenes,created_at,creado_por")
+      .eq("cotizacion_id", id).order("version", { ascending: false });
+    if (error) throw error;
+    setHistorial(data || []);
+    return data || [];
+  }
+
+  function aplicarVersion(version, cabecera, modo = "actualizar") {
+    cargandoVersion.current = true;
+    montajeCargado.current = version.montaje;
+    setCotizacion(prev => ({ ...prev, ...version.datos,
+      cliente: modo === "actualizar" ? String(cabecera.cliente_id) : String(version.datos.cliente || "") }));
+    setImagenes(version.imagenes || []);
+    setResultados(version.resultados || []);
+    setCalculoVigente(false);
+    setMontajeSeleccionado(version.montaje || null);
+    setCotizacionId(modo === "actualizar" ? cabecera.id : null);
+    setNumeroCotizacion(modo === "actualizar" ? cabecera.numero : "");
+    setVersionCotizacion(modo === "actualizar" ? version.version : 0);
+    setCotizacionOriginal(modo === "clonar" ? cabecera.id : null);
+    setModoEdicion(modo);
+    setMotivoActualizacion("");
+    setPantalla("cotizar");
+    setTimeout(() => { cargandoVersion.current = false; montajeCargado.current = null; }, 0);
+  }
+
+  async function abrirCotizacion(cabecera, modo = "actualizar") {
+    try {
+      const versiones = await cargarVersiones(cabecera.id);
+      if (!versiones.length) throw new Error("La cotización no tiene versiones.");
+      aplicarVersion(versiones[0], cabecera, modo);
+      if (modo === "clonar") { setHistorial([]); setVerHistorial(false); }
+    } catch (e) { alert("No se pudo abrir: " + e.message); }
+  }
+
+  async function agregarImagenes(e) {
+    const archivos = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (imagenes.length + archivos.length > 3) {
+      alert("Puedes adjuntar máximo 3 imágenes por cotización."); return;
+    }
+    setOcupado(true);
+    try {
+      const subidas = [];
+      for (const archivo of archivos) {
+        if (!archivo.type.startsWith("image/") || !["image/jpeg","image/png","image/webp"].includes(archivo.type))
+          throw new Error("Solo se admiten imágenes JPG, PNG o WebP.");
+        if (archivo.size > 5 * 1024 * 1024) throw new Error("Cada imagen debe pesar máximo 5 MB.");
+        const extension = archivo.type === "image/png" ? "png" : archivo.type === "image/webp" ? "webp" : "jpg";
+        const ruta = `${usuario.id}/${crypto.randomUUID()}.${extension}`;
+        const { error } = await supabase.storage.from("referencias-cotizaciones")
+          .upload(ruta, archivo, { contentType: archivo.type, upsert: false });
+        if (error) throw error;
+        subidas.push(ruta);
+      }
+      setImagenes(prev => [...prev, ...subidas]);
+    } catch (e) { alert("Error adjuntando imagen: " + e.message); }
+    finally { setOcupado(false); }
+  }
+
+  async function guardarCotizacion() {
+    if (!cotizacion.cliente || !cotizacion.nombre_producto || !resultados.length || !montajeSeleccionado || !calculoVigente) {
+      alert("Pulsa CALCULAR COTIZACIÓN para recalcular con los valores actuales antes de guardar."); return;
+    }
+    if (modoEdicion === "actualizar" && !motivoActualizacion.trim()) {
+      alert("Escribe el motivo de la actualización para conservar la trazabilidad."); return;
+    }
+    setOcupado(true);
+    try {
+      const { data, error } = await supabase.rpc("marprint_guardar_cotizacion", {
+        p_id: modoEdicion === "actualizar" ? cotizacionId : null,
+        p_cliente_id: String(cotizacion.cliente),
+        p_producto: cotizacion.nombre_producto,
+        p_datos: cotizacion,
+        p_montaje: montajeSeleccionado,
+        p_resultados: resultados,
+        p_imagenes: imagenes,
+        p_motivo: modoEdicion === "actualizar" ? motivoActualizacion.trim() :
+          modoEdicion === "clonar" ? "Clonada de otra cotización" : "Cotización inicial",
+        p_origen_id: modoEdicion === "clonar" ? cotizacionOriginal : null,
+      });
+      if (error) throw error;
+      setCotizacionId(data.id);
+      setNumeroCotizacion(data.numero);
+      setVersionCotizacion(data.version);
+      setModoEdicion("actualizar");
+      setCotizacionOriginal(null);
+      setMotivoActualizacion("");
+      await cargarVersiones(data.id);
+      alert(`Cotización ${data.numero} guardada correctamente (versión ${data.version}).`);
+    } catch (e) { alert("No se pudo guardar: " + e.message); }
+    finally { setOcupado(false); }
   }
 
   function calcularCotizacion(e) {
@@ -525,6 +683,7 @@ async function recuperarPassword() {
     });
 
     setResultados(nuevosResultados);
+    setCalculoVigente(true);
   }
 
   if (!usuario) {
@@ -533,10 +692,10 @@ async function recuperarPassword() {
 <style>{`
  .marprint{--blue:#2563eb;--navy:#132b4d;box-sizing:border-box;color:#233650;font-family:Arial,sans-serif;background:#f3f6fb;min-height:100vh;padding:32px!important;max-width:none!important}
  .marprint *{box-sizing:border-box}.marprint h1{color:var(--navy);letter-spacing:-1px;margin:0 0 12px}.marprint h2{font-size:23px}.marprint p{line-height:1.6}.marprint label{font-size:12px;font-weight:700;color:#53647b;display:block;margin-bottom:8px}
- .marprint input:not([type=checkbox]),.marprint select{width:100%;padding:12px!important;background:#fff;border:1px solid #cfdae8;border-radius:9px;font-size:15px;color:#1e3553;min-height:45px}.marprint input:focus,.marprint select:focus{outline:3px solid #bfdbfe;border-color:var(--blue)}
+ .marprint input:not([type=checkbox]),.marprint select,.marprint textarea{width:100%;padding:12px!important;background:#fff;border:1px solid #cfdae8;border-radius:9px;font-size:15px;color:#1e3553;min-height:45px}.marprint input:focus,.marprint select:focus,.marprint textarea:focus{outline:3px solid #bfdbfe;border-color:var(--blue)}
  .marprint button{border:1px solid #d4deec;background:white;color:var(--navy);border-radius:10px;padding:12px 18px;cursor:pointer;font-weight:700}.marprint button:hover{border-color:var(--blue);background:#eff6ff}.marprint button[type=submit]{background:var(--blue);color:white;border-color:var(--blue)}
  .marprint input[type=checkbox]{appearance:none;width:42px;height:24px;background:#cbd5e1;border-radius:20px;vertical-align:middle;position:relative;cursor:pointer}.marprint input[type=checkbox]:after{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:white;border-radius:50%;transition:transform .15s}.marprint input[type=checkbox]:checked{background:var(--blue)}.marprint input[type=checkbox]:checked:after{transform:translateX(18px)}.marprint input[type=checkbox]:focus-visible{outline:3px solid #93c5fd}
- .mp-card{border:1px solid #e0e7f0;border-radius:18px;background:#fff;padding:26px;margin:22px 0;box-shadow:0 5px 20px #132b4d08}.mp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}.mp-card h3{grid-column:1/-1;margin:0 0 6px;color:#132b4d;font-size:18px}.mp-card h3 small{display:block;font-size:13px;font-weight:400;color:#687991;margin-top:8px}.mp-quantities{grid-template-columns:repeat(5,minmax(0,1fr))}
+ .mp-images{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}.mp-images>div{display:grid;gap:6px}.mp-images img{height:110px;width:140px;object-fit:contain;border:1px solid #dae3f0;border-radius:8px}.mp-actions{display:flex;gap:10px;flex-wrap:wrap}.marprint textarea{font-family:inherit;resize:vertical}.mp-card{border:1px solid #e0e7f0;border-radius:18px;background:#fff;padding:26px;margin:22px 0;box-shadow:0 5px 20px #132b4d08}.mp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}.mp-card h3{grid-column:1/-1;margin:0 0 6px;color:#132b4d;font-size:18px}.mp-card h3 small{display:block;font-size:13px;font-weight:400;color:#687991;margin-top:8px}.mp-quantities{grid-template-columns:repeat(5,minmax(0,1fr))}
  .mp-nav{display:flex;flex-direction:column;gap:12px;position:fixed;left:0;top:0;bottom:0;width:220px;padding:30px 20px;background:#132b4d;color:white}.mp-nav strong{font-size:24px;margin-bottom:28px}.mp-nav button{text-align:left;background:#ffffff0d;color:white;border-color:#ffffff20}.mp-nav button[aria-current=page]{background:#2563eb}.mp-app{padding-left:250px!important}.mp-content{max-width:1250px;margin:auto}.mp-login{display:grid;place-items:center;background:linear-gradient(135deg,#10233f,#205aba)}.mp-login-card{background:white;border-radius:22px;padding:36px;width:min(100%,440px);box-shadow:0 20px 60px #0003}.mp-login-card h1{font-size:27px}.mp-login-card form>button[type=submit]{width:100%;margin-top:12px}
  .mp-montage{width:100%;text-align:left!important;display:block}.mp-montage[aria-pressed=true]{border-color:#2563eb!important;background:#eff6ff!important}.mp-sheet{display:grid;gap:3px;background:#dce6f2;border:1px solid #b6c7db;padding:8px;margin:18px auto;max-width:100%;width:220px}.mp-piece{display:block;background:#79a9f5;border:1px solid #3979d8;border-radius:2px;min-height:5px}.mp-badge{display:inline-block;background:#dcfce7;color:#166534;padding:5px 9px;border-radius:20px;font-size:12px}.marprint table{border:0!important;background:white;font-size:13px}.marprint td,.marprint th{padding:13px!important;border:0;border-bottom:1px solid #e5ebf3;white-space:nowrap}.marprint th{background:#132b4d;color:white;position:sticky;top:0}.marprint td:not(:first-child){text-align:right}.marprint tbody tr:nth-child(even){background:#f8fafc}.marprint tbody tr:last-child{background:#e6efff;color:#1749a2;font-size:17px}.mp-table{max-height:650px;overflow:auto;border-radius:12px}.mp-menu{display:flex;gap:20px;flex-wrap:wrap}.mp-menu button{flex:1;min-width:200px;background:white;box-shadow:0 5px 20px #132b4d08;border:1px solid #e0e7f0;padding:40px!important}
  @media(max-width:1000px){.mp-nav{position:static;width:auto;flex-direction:row;flex-wrap:wrap;border-radius:14px;margin-bottom:24px;padding:18px}.mp-nav strong{margin:0 18px 0 0;align-self:center}.mp-app{padding:20px!important}.mp-quantities{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -601,7 +760,7 @@ async function recuperarPassword() {
  @media(max-width:1000px){.mp-nav{position:static;width:auto;flex-direction:row;flex-wrap:wrap;border-radius:14px;margin-bottom:24px;padding:18px}.mp-nav strong{margin:0 18px 0 0;align-self:center}.mp-app{padding:20px!important}.mp-quantities{grid-template-columns:repeat(3,minmax(0,1fr))}}
  @media(max-width:600px){.marprint{padding:16px!important}.mp-grid,.mp-quantities{grid-template-columns:1fr!important}.mp-card{padding:18px}.mp-login-card{padding:26px}.mp-nav strong{width:100%}}
 `}</style>
-<nav className="mp-nav" aria-label="Navegación principal"><strong>Marprint</strong>{[["menu","Inicio"],["clientes","Clientes"],["cotizar","Cotizaciones"]].map(([id,label])=>(<button type="button" key={id} aria-current={pantalla===id ? "page" : undefined} onClick={()=>setPantalla(id)}>{label}</button>))}</nav>
+<nav className="mp-nav" aria-label="Navegación principal"><strong>Marprint</strong>{[["menu","Inicio"],["clientes","Clientes"],["cotizar","Cotizar"],["historial","Historial"]].map(([id,label])=>(<button type="button" key={id} aria-current={pantalla===id ? "page" : undefined} onClick={()=>{setPantalla(id);if(id==="historial")cargarCotizaciones();}}>{label}</button>))}</nav>
 <div className="mp-content">
       <h1>Cotizador Marprint</h1>
       <p>Usuario: {usuario.email}</p>
@@ -630,6 +789,24 @@ async function recuperarPassword() {
             </button>
           </div>
         </div>
+      )}
+
+      {pantalla === "historial" && (
+        <section className="mp-card">
+          <h2>Historial de cotizaciones</h2>
+          <input placeholder="Buscar por número, producto o cliente" value={busqueda}
+            onChange={e => setBusqueda(e.target.value)} />
+          <button type="button" onClick={cargarCotizaciones}>Actualizar lista</button>
+          <div className="mp-table"><table><thead><tr><th>Número</th><th>Producto</th><th>Cliente</th><th>Versión</th><th>Acciones</th></tr></thead><tbody>
+            {cotizacionesGuardadas.filter(c => `${c.numero} ${c.producto} ${catalogos.clientes.find(x => String(x.id)===String(c.cliente_id))?.razon_social || ""}`
+              .toLowerCase().includes(busqueda.toLowerCase())).map(c =>
+              <tr key={c.id}><td>{c.numero}</td><td>{c.producto}</td>
+                <td>{catalogos.clientes.find(x => String(x.id)===String(c.cliente_id))?.razon_social || c.cliente_id}</td>
+                <td>{c.version_actual}</td><td>
+                  <button type="button" onClick={() => abrirCotizacion(c,"actualizar")}>Abrir / actualizar</button>{" "}
+                  <button type="button" onClick={() => abrirCotizacion(c,"clonar")}>Clonar</button>
+                </td></tr>)}</tbody></table></div>
+        </section>
       )}
 
       {pantalla === "clientes" && (
@@ -663,7 +840,13 @@ async function recuperarPassword() {
       {pantalla === "cotizar" && (
         <div>
           <button onClick={() => setPantalla("menu")}>← Volver</button>
-          <h2>Cotizador</h2>
+          <h2>Cotizador {numeroCotizacion ? `· ${numeroCotizacion} · Versión ${versionCotizacion}` : "· Nueva cotización"}</h2>
+          <div className="mp-actions">
+            <button type="button" onClick={nuevaCotizacion}>+ Nueva cotización</button>
+            <button type="button" onClick={() => { setPantalla("historial"); cargarCotizaciones(); }}>Buscar / clonar cotización</button>
+          </div>
+          {modoEdicion === "clonar" && <p className="mp-badge">Clonación: se creará un nuevo consecutivo. Puedes cambiar el cliente.</p>}
+          {modoEdicion === "actualizar" && <p className="mp-badge">Actualización: se conservará el número y el cliente; se guardará una nueva versión.</p>}
 
           <form onSubmit={calcularCotizacion}>
             <div className="mp-card mp-grid"><h3>01 · Información general<small>Selecciona el cliente y describe el producto.</small></h3>
@@ -671,6 +854,7 @@ async function recuperarPassword() {
                 <label>CLIENTE *</label>
                 <select
                   name="cliente"
+                  disabled={modoEdicion === "actualizar"}
                   value={cotizacion.cliente}
                   onChange={cambiarCotizacion}
                   required
@@ -1013,6 +1197,24 @@ async function recuperarPassword() {
                   style={{ width: "100%", padding: 10 }}
                 />
               </div>
+              <div>
+                <label>OBSERVACIÓN DEL COSTO ESPECIAL</label>
+                <textarea name="observacion_costo_especial"
+                  value={cotizacion.observacion_costo_especial || ""}
+                  onChange={cambiarCotizacion} rows={3}
+                  placeholder="¿A qué corresponde este costo?" />
+              </div>
+              <div>
+                <label>IMÁGENES DE REFERENCIA (MÁXIMO 3)</label>
+                <input type="file" accept="image/jpeg,image/png,image/webp"
+                  multiple disabled={ocupado || imagenes.length >= 3} onChange={agregarImagenes} />
+                <small>JPG, PNG o WebP · máximo 5 MB cada una.</small>
+                <div className="mp-images">{imagenes.map(path =>
+                  <div key={path}>
+                    {imagenesVista[path] && <img src={imagenesVista[path]} alt="Referencia de caja" />}
+                    <button type="button" onClick={() => setImagenes(prev => prev.filter(p => p !== path))}>Quitar</button>
+                  </div>)}</div>
+              </div>
             </div>
 
             {opcionesMontaje.length > 0 && (
@@ -1026,7 +1228,7 @@ async function recuperarPassword() {
                       className="mp-montage"
                       aria-pressed={montajeSeleccionado?.id === opcion.id}
                       key={opcion.id}
-                      onClick={() => setMontajeSeleccionado(opcion)}
+                      onClick={() => { setMontajeSeleccionado(opcion); setResultados([]); setCalculoVigente(false); }}
                       style={{
                         padding: 20,
                         border:
@@ -1068,6 +1270,7 @@ async function recuperarPassword() {
                       <p>
                         <strong>Rollo:</strong> {opcion.rollo} cm
                       </p>
+                      <p><strong>Medida de Conversión:</strong> {opcion.rollo.toFixed(2)} x {opcion.largoHoja.toFixed(2)} cm</p>
                       <p>
                         <strong>Desperdicio ancho:</strong>{" "}
                         {opcion.desperdicioAncho.toFixed(2)} cm
@@ -1099,6 +1302,31 @@ async function recuperarPassword() {
               </button>
             </div>
           </form>
+          <section className="mp-card">
+            <h3>Guardar cotización</h3>
+            {modoEdicion === "actualizar" && <div>
+              <label>MOTIVO DE ACTUALIZACIÓN *</label>
+              <textarea rows={3} value={motivoActualizacion}
+                onChange={e => setMotivoActualizacion(e.target.value)}
+                placeholder="Ej.: actualización de precios, se agregó pegue..." />
+            </div>}
+            <button type="button" disabled={ocupado || !calculoVigente || resultados.length === 0}
+              onClick={guardarCotizacion}>{ocupado ? "Guardando..." :
+                modoEdicion === "actualizar" ? "GUARDAR NUEVA VERSIÓN" : "GUARDAR NUEVA COTIZACIÓN"}</button>
+            {modoEdicion === "actualizar" && <>
+              <button type="button" onClick={() => setVerHistorial(v => !v)}>Ver / comparar versiones</button>
+              {verHistorial && <div className="mp-table"><table><thead><tr>
+                <th>Versión</th><th>Fecha</th><th>Motivo</th><th>Precios unitarios por cantidad</th><th>Acción</th>
+              </tr></thead><tbody>{historial.map(v => <tr key={v.id}>
+                <td>{v.version}</td><td>{new Date(v.created_at).toLocaleString("es-CO")}</td>
+                <td>{v.motivo}</td><td>{(v.resultados || []).map(r => `${r.cantidad}: ${moneda(r.valorUnitario)}`).join(" · ")}</td>
+                <td><button type="button" onClick={() => {
+                  if (confirm("¿Cargar esta versión como base de una nueva actualización? El historial permanecerá intacto."))
+                    aplicarVersion(v,{id:cotizacionId,numero:numeroCotizacion,cliente_id:cotizacion.cliente});
+                }}>Usar como base</button></td>
+              </tr>)}</tbody></table></div>}
+            </>}
+          </section>
 
           {resultados.length > 0 && (
             <div className="mp-card">
