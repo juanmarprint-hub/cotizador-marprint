@@ -366,12 +366,39 @@ async function recuperarPassword() {
   }
 
   async function cargarCotizaciones() {
-    const { data, error } = await supabase.from("marprint_cotizaciones")
-      .select("id,numero,cliente_id,producto,version_actual,origen_id,created_at,updated_at")
-      .order("updated_at", { ascending: false }).limit(500);
-    if (error) { alert("No se pudo consultar el historial: " + error.message); return; }
+  const { data, error } = await supabase.from("marprint_cotizaciones")
+    .select("id,numero,cliente_id,producto,version_actual,origen_id,created_at,updated_at")
+    .eq("eliminada", false)
+    .order("updated_at", { ascending: false })
+    .limit(500);
+  if (error) { alert("No se pudo consultar el historial: " + error.message); return; }
     setCotizacionesGuardadas(data || []);
   }
+
+  async function eliminarCotizacion(cabecera) {
+  const confirmar = window.confirm(
+    `¿Estás seguro de eliminar la cotización ${cabecera.numero}?\n\n` +
+    `Producto: ${cabecera.producto}\n\n` +
+    `La cotización desaparecerá del historial, pero podrá recuperarse desde Supabase.`
+  );
+
+  if (!confirmar) return;
+
+  try {
+    const { error } = await supabase.rpc(
+      "marprint_eliminar_cotizacion",
+      { p_id: cabecera.id }
+    );
+
+    if (error) throw error;
+
+    await cargarCotizaciones();
+
+    alert(`Cotización ${cabecera.numero} eliminada correctamente.`);
+  } catch (e) {
+    alert("No se pudo eliminar la cotización: " + e.message);
+  }
+}
 
   function nuevaCotizacion() {
     setCotizacionId(null);
@@ -834,8 +861,35 @@ const empaque =
               <tr key={c.id}><td>{c.numero}</td><td>{c.producto}</td>
                 <td>{catalogos.clientes.find(x => String(x.id)===String(c.cliente_id))?.razon_social || c.cliente_id}</td>
                 <td>{c.version_actual}</td><td>
-                  <button type="button" onClick={() => abrirCotizacion(c,"actualizar")}>Abrir / actualizar</button>{" "}
-                  <button type="button" onClick={() => abrirCotizacion(c,"clonar")}>Clonar</button>
+<button
+  type="button"
+  onClick={() => abrirCotizacion(c, "actualizar")}
+>
+  Abrir / actualizar
+</button>{" "}
+
+<button
+  type="button"
+  onClick={() => abrirCotizacion(c, "clonar")}
+>
+  Clonar
+</button>{" "}
+
+<button
+  type="button"
+  onClick={() => eliminarCotizacion(c)}
+  style={{
+    backgroundColor: "#dc2626",
+    color: "white",
+    border: "1px solid #dc2626",
+    borderRadius: "8px",
+    padding: "10px 14px",
+    fontWeight: "bold",
+    cursor: "pointer"
+  }}
+>
+  🗑️ Eliminar
+</button>
                 </td></tr>)}</tbody></table></div>
         </section>
       )}
