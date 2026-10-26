@@ -474,6 +474,9 @@ async function recuperarPassword() {
         p_origen_id: modoEdicion === "clonar" ? cotizacionOriginal : null,
       });
       if (error) throw error;
+      
+      console.log("RESPUESTA SUPABASE:", data);
+      
       setCotizacionId(data.id);
       setNumeroCotizacion(data.numero);
       setVersionCotizacion(data.version);
