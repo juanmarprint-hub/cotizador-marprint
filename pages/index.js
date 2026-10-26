@@ -631,7 +631,12 @@ async function recuperarPassword() {
 
       const costoEspecial = numero(cotizacion.costo_especial) * cantidad;
 
-      const empaque = constante("FACTOR EMPAQUE") * cantidad * 1000;
+      const areaCajaM2 =
+  (numero(cotizacion.largo_abierta) *
+    numero(cotizacion.ancho_abierta)) / 10000;
+
+const empaque =
+  constante("FACTOR EMPAQUE") * areaCajaM2 * cantidad;
 
       const envioCosto = envio ? pesoKg * numero(envio.valor_env_kg) : 0;
 
