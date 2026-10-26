@@ -23,7 +23,6 @@ function moneda(valor) {
 function obtenerMejoresMontajes(largoCaja, anchoCaja) {
   const margen = 2;
   const opciones = [];
-
   const orientaciones = [
     { nombre: "Normal", largo: largoCaja, ancho: anchoCaja },
     { nombre: "Girada", largo: anchoCaja, ancho: largoCaja },
@@ -37,55 +36,72 @@ function obtenerMejoresMontajes(largoCaja, anchoCaja) {
         const anchoHoja = anchoMontaje + margen;
         const largoHoja = largoMontaje + margen;
 
+        // Restricciones originales de la hoja para impresión.
         if (anchoHoja < 35 || largoHoja < 45) continue;
         if (anchoHoja > 70 || largoHoja > 100) continue;
 
-        for (const rollo of anchosRollo) {
-          if (anchoHoja <= rollo) {
-            const areaCosteo = rollo * largoHoja;
-            const areaPiezas =
-              orientacion.ancho * orientacion.largo * columnas * filas;
-
-            opciones.push({
-              id: `${orientacion.nombre}-${columnas}-${filas}-${rollo}`,
-              orientacion: orientacion.nombre,
-              columnas,
-              filas,
-              piezasPorHoja: columnas * filas,
-              anchoMontaje,
-              largoMontaje,
-              anchoHoja,
-              largoHoja,
+        // La orientación de conversión del rollo es independiente
+        // de la orientación de las cajas dentro de la hoja.
+        const conversiones = [
+          { anchoCorte: anchoHoja, largoCorte: largoHoja },
+          { anchoCorte: largoHoja, largoCorte: anchoHoja },
+        ];
+        let mejorConversion = null;
+        for (const conversion of conversiones) {
+          for (const rollo of anchosRollo) {
+            if (rollo < conversion.anchoCorte) continue;
+            const areaCosteo = rollo * conversion.largoCorte;
+            const candidata = {
               rollo,
-              desperdicioAncho: rollo - anchoHoja,
-              aprovechamiento: (areaPiezas / areaCosteo) * 100,
-            });
+              largoCorte: conversion.largoCorte,
+              desperdicioAncho: rollo - conversion.anchoCorte,
+              areaCosteo,
+            };
+            if (!mejorConversion ||
+                candidata.areaCosteo < mejorConversion.areaCosteo - 1e-9 ||
+                (Math.abs(candidata.areaCosteo - mejorConversion.areaCosteo) < 1e-9 &&
+                 candidata.desperdicioAncho < mejorConversion.desperdicioAncho)) {
+              mejorConversion = candidata;
+            }
           }
         }
+        if (!mejorConversion) continue;
+        const piezasPorHoja = columnas * filas;
+        const areaPiezas = anchoMontaje * largoMontaje;
+        opciones.push({
+          id: `${orientacion.nombre}-${columnas}-${filas}-${mejorConversion.rollo}-${mejorConversion.largoCorte}`,
+          orientacion: orientacion.nombre,
+          columnas,
+          filas,
+          piezasPorHoja,
+          anchoMontaje,
+          largoMontaje,
+          anchoHoja,
+          largoHoja,
+          rollo: mejorConversion.rollo,
+          largoCorte: mejorConversion.largoCorte,
+          desperdicioAncho: mejorConversion.desperdicioAncho,
+          aprovechamiento: (areaPiezas / mejorConversion.areaCosteo) * 100,
+        });
       }
     }
   }
 
-  const mejores = [...opciones]
-    .sort((a, b) => {
-      if (b.piezasPorHoja !== a.piezasPorHoja) {
-        return b.piezasPorHoja - a.piezasPorHoja;
-      }
-      if (a.desperdicioAncho !== b.desperdicioAncho) {
-        return a.desperdicioAncho - b.desperdicioAncho;
-      }
-      return b.aprovechamiento - a.aprovechamiento;
-    })
-    .slice(0, 4);
+  const mejores = [...opciones].sort((a, b) => {
+    if (b.piezasPorHoja !== a.piezasPorHoja) return b.piezasPorHoja - a.piezasPorHoja;
+    const areaA = a.rollo * a.largoCorte;
+    const areaB = b.rollo * b.largoCorte;
+    if (areaA !== areaB) return areaA - areaB;
+    return a.desperdicioAncho - b.desperdicioAncho;
+  }).slice(0, 4);
 
-  const masPequeno = [...opciones].sort((a, b) => {
-    return a.anchoHoja * a.largoHoja - b.anchoHoja * b.largoHoja;
-  })[0];
-
+  const masPequeno = [...opciones].sort((a, b) =>
+    a.anchoHoja * a.largoHoja - b.anchoHoja * b.largoHoja ||
+    a.rollo * a.largoCorte - b.rollo * b.largoCorte
+  )[0];
   if (masPequeno && !mejores.some((m) => m.id === masPequeno.id)) {
     mejores[3] = masPequeno;
   }
-
   return mejores;
 }
 
@@ -235,7 +251,7 @@ export default function Home() {
       setMontajeSeleccionado(prev => {
         const guardado = montajeCargado.current;
         montajeCargado.current = null;
-        return guardado || opciones.find(o => o.id === prev?.id) || opciones[0] || null;
+        return opciones.find(o => o.id === guardado?.id) || opciones.find(o => o.id === prev?.id) || opciones[0] || null;
       });
     } else {
       setOpcionesMontaje([]);
@@ -507,7 +523,7 @@ async function recuperarPassword() {
     }
 
     const areaCosteoM2 =
-      (montajeSeleccionado.rollo * montajeSeleccionado.largoHoja) / 10000;
+      (montajeSeleccionado.rollo * (montajeSeleccionado.largoCorte ?? montajeSeleccionado.largoHoja)) / 10000;
 
     const tintas = numero(cotizacion.tintas);
 
@@ -1270,7 +1286,7 @@ async function recuperarPassword() {
                       <p>
                         <strong>Rollo:</strong> {opcion.rollo} cm
                       </p>
-                      <p><strong>Medida de Conversión:</strong> {opcion.rollo.toFixed(2)} x {opcion.largoHoja.toFixed(2)} cm</p>
+                      <p><strong>Medida de Conversión:</strong> {opcion.rollo.toFixed(2)} x {opcion.largoCorte.toFixed(2)} cm</p>
                       <p>
                         <strong>Desperdicio ancho:</strong>{" "}
                         {opcion.desperdicioAncho.toFixed(2)} cm
