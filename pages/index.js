@@ -1006,6 +1006,7 @@ const empaque =
                   {catalogos.materiales.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.material} - Calibre {m.calibre} -{" "}
+                      {numero(m.peso_basico)} g/m² -{" "}
                       {moneda(m.valor_pap_m2)}/m²
                     </option>
                   ))}
