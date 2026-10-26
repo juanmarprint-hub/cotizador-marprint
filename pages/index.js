@@ -491,7 +491,7 @@ setCotizacionOriginal(null);
 setMotivoActualizacion("");
 
 await cargarVersiones(guardada.id);
-      alert(`Cotización ${data.numero} guardada correctamente (versión ${data.version}).`);
+      alert(`Cotización ${guardada.numero} guardada correctamente (versión ${guardada.version}).`);
     } catch (e) { alert("No se pudo guardar: " + e.message); }
     finally { setOcupado(false); }
   }
