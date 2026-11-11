@@ -65,7 +65,8 @@ function obtenerMejoresMontajes(caja, tipo) {
           ? a.areaCosteo - b.areaCosteo
           : a.desperdicioAncho - b.desperdicioAncho);
 
-        const ejeAltoCaja = orientacion.girada ? "largo" : "ancho";
+        // El doblez de la aleta de pegue corre en el eje alto del troquel.
+        const ejeAletaPegue = orientacion.girada ? "largo" : "ancho";
         const candidatas = tipo === "manual" ? conversionesViables.slice(0, 1) : conversionesViables;
         for (const [indice, conversion] of candidatas.entries()) {
           const { rollo, largoCorte, ejeFibra, desperdicioAncho, areaCosteo } = conversion;
@@ -86,7 +87,7 @@ function obtenerMejoresMontajes(caja, tipo) {
             rollo,
             largoCorte,
             ejeFibra,
-            ...(tipo !== "manual" && { fibraPerpendicularAlAlto: ejeFibra !== ejeAltoCaja }),
+            ...(tipo !== "manual" && { fibraPerpendicularAlPegue: ejeFibra !== ejeAletaPegue }),
             desperdicioAncho,
             aprovechamiento: (anchoMontaje * largoMontaje / areaCosteo) * 100,
           });
@@ -108,14 +109,15 @@ function obtenerMejoresMontajes(caja, tipo) {
     a.rollo * a.largoCorte - b.rollo * b.largoCorte
   )[0];
   if (tipo !== "manual") {
-    const elegidas = new Set(ordenadas.filter(opcion => opcion.fibraPerpendicularAlAlto)
+    const elegidas = new Set(ordenadas.filter(opcion => opcion.fibraPerpendicularAlPegue)
       .slice(0, 2).map(opcion => opcion.id));
     if (masPequeno) elegidas.add(masPequeno.id);
     for (const opcion of ordenadas) {
       if (elegidas.size >= 4) break;
       elegidas.add(opcion.id);
     }
-    return ordenadas.filter(opcion => elegidas.has(opcion.id));
+    return ordenadas.filter(opcion => elegidas.has(opcion.id))
+      .sort((a, b) => Number(b.fibraPerpendicularAlPegue) - Number(a.fibraPerpendicularAlPegue));
   }
 
   const mejores = ordenadas.slice(0, 4);
@@ -172,7 +174,7 @@ function DibujoMontaje({ caja, opcion }) {
             fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
         </svg>
         <small>Fibra paralela al {opcion.ejeFibra} de la hoja</small>
-        {opcion.fibraPerpendicularAlAlto && <small><strong>Perpendicular al alto de la caja</strong></small>}
+        {opcion.fibraPerpendicularAlPegue && <small><strong>Fibra perpendicular a la aleta de pegue</strong></small>}
       </span>
     </span>
   );
