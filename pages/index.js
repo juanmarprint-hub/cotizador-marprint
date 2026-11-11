@@ -48,8 +48,8 @@ function obtenerMejoresMontajes(caja, tipo) {
         // La orientación de conversión del rollo es independiente
         // de la orientación de las cajas dentro de la hoja.
         const conversiones = [
-          { anchoCorte: anchoHoja, largoCorte: largoHoja },
-          { anchoCorte: largoHoja, largoCorte: anchoHoja },
+          { anchoCorte: anchoHoja, largoCorte: largoHoja, ejeFibra: "largo" },
+          { anchoCorte: largoHoja, largoCorte: anchoHoja, ejeFibra: "ancho" },
         ];
         let mejorConversion = null;
         for (const conversion of conversiones) {
@@ -59,6 +59,7 @@ function obtenerMejoresMontajes(caja, tipo) {
             const candidata = {
               rollo,
               largoCorte: conversion.largoCorte,
+              ejeFibra: conversion.ejeFibra,
               desperdicioAncho: rollo - conversion.anchoCorte,
               areaCosteo,
             };
@@ -85,6 +86,7 @@ function obtenerMejoresMontajes(caja, tipo) {
           largoHoja,
           rollo: mejorConversion.rollo,
           largoCorte: mejorConversion.largoCorte,
+          ejeFibra: mejorConversion.ejeFibra,
           desperdicioAncho: mejorConversion.desperdicioAncho,
           aprovechamiento: (areaPiezas / mejorConversion.areaCosteo) * 100,
         });
@@ -121,31 +123,41 @@ function DibujoMontaje({ caja, opcion }) {
   const puntosCorte = troquel?.corte.map(punto => punto.join(",")).join(" ");
 
   return (
-    <svg role="img" aria-label={`Montaje de ${columnas} columnas por ${filas} filas`}
-      viewBox={`${-borde} ${-borde} ${anchoMontaje + 2 * borde} ${largoMontaje + 2 * borde}`}
-      style={{ display: "block", width: "100%", height: 190, margin: "12px 0", background: "#f8fafc" }}>
-      {Array.from({ length: columnas * filas }, (_, i) => {
-        const x = (i % columnas) * pasoX;
-        const y = Math.floor(i / columnas) * pasoY;
-        return (
-          <g key={i} transform={girada ? `translate(${x} ${y})` : `translate(${x + caja.ancho} ${y}) rotate(90)`}>
-            {troquel ? (
-              <>
-                <polygon points={puntosCorte} fill={i % 2 ? "#dbeafe" : "#eff6ff"}
+    <span style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0", background: "#f8fafc" }}>
+      <svg role="img" aria-label={`Montaje de ${columnas} columnas por ${filas} filas`}
+        viewBox={`${-borde} ${-borde} ${anchoMontaje + 2 * borde} ${largoMontaje + 2 * borde}`}
+        style={{ display: "block", flex: 1, minWidth: 0, height: 190 }}>
+        {Array.from({ length: columnas * filas }, (_, i) => {
+          const x = (i % columnas) * pasoX;
+          const y = Math.floor(i / columnas) * pasoY;
+          return (
+            <g key={i} transform={girada ? `translate(${x} ${y})` : `translate(${x + caja.ancho} ${y}) rotate(90)`}>
+              {troquel ? (
+                <>
+                  <polygon points={puntosCorte} fill={i % 2 ? "#dbeafe" : "#eff6ff"}
+                    stroke="#24466c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                  {troquel.dobleces.map(([x1, y1, x2, y2], j) => (
+                    <line key={j} x1={x1} y1={y1} x2={x2} y2={y2}
+                      stroke="#a1422c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                  ))}
+                </>
+              ) : (
+                <rect width={caja.largo} height={caja.ancho} fill="#dbeafe"
                   stroke="#24466c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                {troquel.dobleces.map(([x1, y1, x2, y2], j) => (
-                  <line key={j} x1={x1} y1={y1} x2={x2} y2={y2}
-                    stroke="#a1422c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-                ))}
-              </>
-            ) : (
-              <rect width={caja.largo} height={caja.ancho} fill="#dbeafe"
-                stroke="#24466c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-            )}
-          </g>
-        );
-      })}
-    </svg>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      <span style={{ display: "grid", justifyItems: "center", flex: "0 0 92px", padding: 6, color: "#b51649", textAlign: "center" }}>
+        <svg aria-hidden="true" width="62" height="62" viewBox="0 0 64 64">
+          <path d="M 16 41 L 3 32 H 61 L 48 23"
+            transform={opcion.ejeFibra === "largo" ? "rotate(90 32 32)" : undefined}
+            fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        </svg>
+        <small>Fibra paralela al {opcion.ejeFibra}</small>
+      </span>
+    </span>
   );
 }
 
