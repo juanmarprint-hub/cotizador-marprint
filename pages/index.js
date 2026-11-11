@@ -206,8 +206,6 @@ export default function Home() {
     nombre_producto: "",
     tipo_caja: "",
     diseno_cierre_mm: "",
-    diseno_solapa: "",
-    diseno_oreja: "",
     diseno_ajuste: "",
     diseno_separacion: "",
     largo_abierta: "",
@@ -496,7 +494,7 @@ async function recuperarPassword() {
       ...(version.datos.tipo_caja === "solapas_alternadas" &&
           version.datos.diseno_cierre_mm == null &&
           Number(version.datos.diseno_solapa) > 1.6
-        ? { diseno_solapa: String(Number((Number(version.datos.diseno_solapa) - 1.6).toFixed(6))), diseno_cierre_mm: "16" }
+        ? { diseno_cierre_mm: "16" }
         : {}),
       cliente: modo === "actualizar" ? String(cabecera.cliente_id) : String(version.datos.cliente || "") }));
     setImagenes(version.imagenes || []);
@@ -1151,7 +1149,7 @@ const empaque =
               {tipoDiseno !== "manual" && (
                 <p>{caja
                   ? `Caja abierta: ${Number(largoCaja.toFixed(3))} × ${Number(anchoCaja.toFixed(3))} cm`
-                  : "Completa las medidas. La solapa lateral no puede superar la larga y la reducción debe ser menor que el ancho armado."}</p>
+                  : "Completa las medidas y verifica que la reducción del último panel sea menor que el ancho armado."}</p>
               )}
 
               <div>
