@@ -51,61 +51,74 @@ function obtenerMejoresMontajes(caja, tipo) {
           { anchoCorte: anchoHoja, largoCorte: largoHoja, ejeFibra: "largo" },
           { anchoCorte: largoHoja, largoCorte: anchoHoja, ejeFibra: "ancho" },
         ];
-        let mejorConversion = null;
-        for (const conversion of conversiones) {
-          for (const rollo of anchosRollo) {
-            if (rollo < conversion.anchoCorte) continue;
-            const areaCosteo = rollo * conversion.largoCorte;
-            const candidata = {
-              rollo,
-              largoCorte: conversion.largoCorte,
-              ejeFibra: conversion.ejeFibra,
-              desperdicioAncho: rollo - conversion.anchoCorte,
-              areaCosteo,
-            };
-            if (!mejorConversion ||
-                candidata.areaCosteo < mejorConversion.areaCosteo - 1e-9 ||
-                (Math.abs(candidata.areaCosteo - mejorConversion.areaCosteo) < 1e-9 &&
-                 candidata.desperdicioAncho < mejorConversion.desperdicioAncho)) {
-              mejorConversion = candidata;
-            }
-          }
+        const conversionesViables = conversiones.flatMap(conversion => {
+          const rollo = anchosRollo.find(ancho => ancho >= conversion.anchoCorte);
+          if (rollo === undefined) return [];
+          return [{
+            rollo,
+            largoCorte: conversion.largoCorte,
+            ejeFibra: conversion.ejeFibra,
+            desperdicioAncho: rollo - conversion.anchoCorte,
+            areaCosteo: rollo * conversion.largoCorte,
+          }];
+        }).sort((a, b) => Math.abs(a.areaCosteo - b.areaCosteo) > 1e-9
+          ? a.areaCosteo - b.areaCosteo
+          : a.desperdicioAncho - b.desperdicioAncho);
+
+        const ejeAltoCaja = orientacion.girada ? "largo" : "ancho";
+        const candidatas = tipo === "manual" ? conversionesViables.slice(0, 1) : conversionesViables;
+        for (const [indice, conversion] of candidatas.entries()) {
+          const { rollo, largoCorte, ejeFibra, desperdicioAncho, areaCosteo } = conversion;
+          const idBase = `${tipo === "manual" ? "" : tipo + "-"}${orientacion.nombre}-${columnas}-${filas}-${rollo}-${largoCorte}`;
+          const preferida = conversionesViables[0];
+          const id = indice > 0 && rollo === preferida.rollo && largoCorte === preferida.largoCorte
+            ? `${idBase}-${ejeFibra}` : idBase;
+          opciones.push({
+            id,
+            orientacion: orientacion.nombre,
+            columnas,
+            filas,
+            piezasPorHoja: columnas * filas,
+            anchoMontaje,
+            largoMontaje,
+            anchoHoja,
+            largoHoja,
+            rollo,
+            largoCorte,
+            ejeFibra,
+            ...(tipo !== "manual" && { fibraPerpendicularAlAlto: ejeFibra !== ejeAltoCaja }),
+            desperdicioAncho,
+            aprovechamiento: (anchoMontaje * largoMontaje / areaCosteo) * 100,
+          });
         }
-        if (!mejorConversion) continue;
-        const piezasPorHoja = columnas * filas;
-        const areaPiezas = anchoMontaje * largoMontaje;
-        opciones.push({
-          id: `${tipo === "manual" ? "" : tipo + "-"}${orientacion.nombre}-${columnas}-${filas}-${mejorConversion.rollo}-${mejorConversion.largoCorte}`,
-          orientacion: orientacion.nombre,
-          columnas,
-          filas,
-          piezasPorHoja,
-          anchoMontaje,
-          largoMontaje,
-          anchoHoja,
-          largoHoja,
-          rollo: mejorConversion.rollo,
-          largoCorte: mejorConversion.largoCorte,
-          ejeFibra: mejorConversion.ejeFibra,
-          desperdicioAncho: mejorConversion.desperdicioAncho,
-          aprovechamiento: (areaPiezas / mejorConversion.areaCosteo) * 100,
-        });
       }
     }
   }
 
-  const mejores = [...opciones].sort((a, b) => {
+  const ordenadas = [...opciones].sort((a, b) => {
     if (b.piezasPorHoja !== a.piezasPorHoja) return b.piezasPorHoja - a.piezasPorHoja;
     const areaA = a.rollo * a.largoCorte;
     const areaB = b.rollo * b.largoCorte;
     if (areaA !== areaB) return areaA - areaB;
     return a.desperdicioAncho - b.desperdicioAncho;
-  }).slice(0, 4);
+  });
 
   const masPequeno = [...opciones].sort((a, b) =>
     a.anchoHoja * a.largoHoja - b.anchoHoja * b.largoHoja ||
     a.rollo * a.largoCorte - b.rollo * b.largoCorte
   )[0];
+  if (tipo !== "manual") {
+    const elegidas = new Set(ordenadas.filter(opcion => opcion.fibraPerpendicularAlAlto)
+      .slice(0, 2).map(opcion => opcion.id));
+    if (masPequeno) elegidas.add(masPequeno.id);
+    for (const opcion of ordenadas) {
+      if (elegidas.size >= 4) break;
+      elegidas.add(opcion.id);
+    }
+    return ordenadas.filter(opcion => elegidas.has(opcion.id));
+  }
+
+  const mejores = ordenadas.slice(0, 4);
   if (masPequeno && !mejores.some((m) => m.id === masPequeno.id)) {
     mejores[3] = masPequeno;
   }
@@ -158,7 +171,8 @@ function DibujoMontaje({ caja, opcion }) {
             transform={opcion.ejeFibra === "largo" ? "rotate(90 32 32)" : undefined}
             fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
         </svg>
-        <small>Fibra paralela al {opcion.ejeFibra}</small>
+        <small>Fibra paralela al {opcion.ejeFibra} de la hoja</small>
+        {opcion.fibraPerpendicularAlAlto && <small><strong>Perpendicular al alto de la caja</strong></small>}
       </span>
     </span>
   );
