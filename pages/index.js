@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { dimensionesMontaje, medidasCaja, plantillasCaja, tipoCaja, trazadoTroquel } from "../lib/disenoMontaje.mjs";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -20,19 +21,23 @@ function moneda(valor) {
   }).format(valor || 0);
 }
 
-function obtenerMejoresMontajes(largoCaja, anchoCaja) {
+function obtenerMejoresMontajes(caja, tipo) {
   const margen = 2;
   const opciones = [];
   const orientaciones = [
-    { nombre: "Normal", largo: largoCaja, ancho: anchoCaja },
-    { nombre: "Girada", largo: anchoCaja, ancho: largoCaja },
+    { nombre: "Normal", girada: false },
+    { nombre: "Girada", girada: true },
   ];
 
   for (const orientacion of orientaciones) {
     for (let columnas = 1; columnas <= 10; columnas++) {
       for (let filas = 1; filas <= 10; filas++) {
-        const anchoMontaje = orientacion.ancho * columnas;
-        const largoMontaje = orientacion.largo * filas;
+        const { anchoMontaje, largoMontaje } = tipo === "manual"
+          ? {
+              anchoMontaje: (orientacion.girada ? caja.largo : caja.ancho) * columnas,
+              largoMontaje: (orientacion.girada ? caja.ancho : caja.largo) * filas,
+            }
+          : dimensionesMontaje(caja, columnas, filas, orientacion.girada);
         const anchoHoja = anchoMontaje + margen;
         const largoHoja = largoMontaje + margen;
 
@@ -69,7 +74,7 @@ function obtenerMejoresMontajes(largoCaja, anchoCaja) {
         const piezasPorHoja = columnas * filas;
         const areaPiezas = anchoMontaje * largoMontaje;
         opciones.push({
-          id: `${orientacion.nombre}-${columnas}-${filas}-${mejorConversion.rollo}-${mejorConversion.largoCorte}`,
+          id: `${tipo === "manual" ? "" : tipo + "-"}${orientacion.nombre}-${columnas}-${filas}-${mejorConversion.rollo}-${mejorConversion.largoCorte}`,
           orientacion: orientacion.nombre,
           columnas,
           filas,
@@ -103,6 +108,45 @@ function obtenerMejoresMontajes(largoCaja, anchoCaja) {
     mejores[3] = masPequeno;
   }
   return mejores;
+}
+
+function DibujoMontaje({ caja, opcion }) {
+  if (!caja) return null;
+  const { anchoMontaje, largoMontaje, columnas, filas, orientacion } = opcion;
+  const girada = orientacion === "Girada";
+  const pasoX = girada ? caja.pasoLargo : caja.pasoAncho;
+  const pasoY = girada ? caja.pasoAncho : caja.pasoLargo;
+  const troquel = caja.troquel ? trazadoTroquel(caja) : null;
+  const borde = Math.max(anchoMontaje, largoMontaje) * 0.025;
+  const puntosCorte = troquel?.corte.map(punto => punto.join(",")).join(" ");
+
+  return (
+    <svg role="img" aria-label={`Montaje de ${columnas} columnas por ${filas} filas`}
+      viewBox={`${-borde} ${-borde} ${anchoMontaje + 2 * borde} ${largoMontaje + 2 * borde}`}
+      style={{ display: "block", width: "100%", height: 190, margin: "12px 0", background: "#f8fafc" }}>
+      {Array.from({ length: columnas * filas }, (_, i) => {
+        const x = (i % columnas) * pasoX;
+        const y = Math.floor(i / columnas) * pasoY;
+        return (
+          <g key={i} transform={girada ? `translate(${x} ${y})` : `translate(${x + caja.ancho} ${y}) rotate(90)`}>
+            {troquel ? (
+              <>
+                <polygon points={puntosCorte} fill={i % 2 ? "#dbeafe" : "#eff6ff"}
+                  stroke="#24466c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                {troquel.dobleces.map(([x1, y1, x2, y2], j) => (
+                  <line key={j} x1={x1} y1={y1} x2={x2} y2={y2}
+                    stroke="#a1422c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                ))}
+              </>
+            ) : (
+              <rect width={caja.largo} height={caja.ancho} fill="#dbeafe"
+                stroke="#24466c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
 }
 
 export default function Home() {
@@ -160,6 +204,12 @@ export default function Home() {
     fv: false,
     linea: "",
     nombre_producto: "",
+    tipo_caja: "",
+    diseno_cierre_mm: "",
+    diseno_solapa: "",
+    diseno_oreja: "",
+    diseno_ajuste: "",
+    diseno_separacion: "",
     largo_abierta: "",
     ancho_abierta: "",
     largo_armada: "",
@@ -241,12 +291,18 @@ export default function Home() {
     if (usuario) cargarCatalogos();
   }, [usuario]);
 
-  useEffect(() => {
-    const largo = parseFloat(cotizacion.largo_abierta);
-    const ancho = parseFloat(cotizacion.ancho_abierta);
+  const tipoDiseno = tipoCaja(cotizacion);
+  const caja = medidasCaja(cotizacion);
+  const largoCaja = caja?.largo;
+  const anchoCaja = caja?.ancho;
+  const pasoLargoCaja = caja?.pasoLargo;
+  const pasoAnchoCaja = caja?.pasoAncho;
 
-    if (largo > 0 && ancho > 0) {
-      const opciones = obtenerMejoresMontajes(largo, ancho);
+  useEffect(() => {
+    if (largoCaja > 0 && anchoCaja > 0) {
+      const opciones = obtenerMejoresMontajes({
+        largo: largoCaja, ancho: anchoCaja, pasoLargo: pasoLargoCaja, pasoAncho: pasoAnchoCaja,
+      }, tipoDiseno);
       setOpcionesMontaje(opciones);
       setMontajeSeleccionado(prev => {
         const guardado = montajeCargado.current;
@@ -260,7 +316,7 @@ export default function Home() {
 
     if (cargandoVersion.current) { cargandoVersion.current = false; }
     else { setResultados([]); setCalculoVigente(false); }
-  }, [cotizacion.largo_abierta, cotizacion.ancho_abierta]);
+  }, [tipoDiseno, largoCaja, anchoCaja, pasoLargoCaja, pasoAnchoCaja]);
 async function recuperarPassword() {
   const correo = email.trim();
 
@@ -307,9 +363,13 @@ async function recuperarPassword() {
 
   function cambiarCotizacion(e) {
     const { name, value, type, checked } = e.target;
-    setCotizacion({
-      ...cotizacion,
-      [name]: type === "checkbox" ? checked : value,
+    setCotizacion(prev => {
+      const valoresPlantilla = name === "tipo_caja"
+        ? Object.fromEntries((plantillasCaja[value]?.campos ?? []).map(({ id, valor }) => [
+            `diseno_${id}`, prev[`diseno_${id}`] || valor,
+          ]))
+        : {};
+      return { ...prev, ...valoresPlantilla, [name]: type === "checkbox" ? checked : value };
     });
     setResultados([]);
     setCalculoVigente(false);
@@ -429,7 +489,15 @@ async function recuperarPassword() {
   function aplicarVersion(version, cabecera, modo = "actualizar") {
     cargandoVersion.current = true;
     montajeCargado.current = version.montaje;
-    setCotizacion(prev => ({ ...prev, ...version.datos,
+    setCotizacion(prev => ({ ...prev,
+      tipo_caja: "manual",
+      ...Object.fromEntries(plantillasCaja.solapas_alternadas.campos.map(({ id, valor }) => [`diseno_${id}`, valor])),
+      ...version.datos,
+      ...(version.datos.tipo_caja === "solapas_alternadas" &&
+          version.datos.diseno_cierre_mm == null &&
+          Number(version.datos.diseno_solapa) > 1.6
+        ? { diseno_solapa: String(Number((Number(version.datos.diseno_solapa) - 1.6).toFixed(6))), diseno_cierre_mm: "16" }
+        : {}),
       cliente: modo === "actualizar" ? String(cabecera.cliente_id) : String(version.datos.cliente || "") }));
     setImagenes(version.imagenes || []);
     setResultados(version.resultados || []);
@@ -492,7 +560,9 @@ async function recuperarPassword() {
         p_id: modoEdicion === "actualizar" ? cotizacionId : null,
         p_cliente_id: String(cotizacion.cliente),
         p_producto: cotizacion.nombre_producto,
-        p_datos: cotizacion,
+        p_datos: tipoDiseno === "manual" ? cotizacion : {
+          ...cotizacion, largo_abierta: largoCaja, ancho_abierta: anchoCaja,
+        },
         p_montaje: montajeSeleccionado,
         p_resultados: resultados,
         p_imagenes: imagenes,
@@ -668,9 +738,7 @@ await cargarVersiones(guardada.id);
 
       const costoEspecial = numero(cotizacion.costo_especial) * cantidad;
 
-      const areaCajaM2 =
-  (numero(cotizacion.largo_abierta) *
-    numero(cotizacion.ancho_abierta)) / 10000;
+      const areaCajaM2 = (largoCaja * anchoCaja) / 10000;
 
 const empaque =
   constante("FACTOR EMPAQUE") * areaCajaM2 * cantidad;
@@ -996,6 +1064,17 @@ const empaque =
 
 </div><div className="mp-card mp-grid "><h3>02 · Especificaciones del producto<small>Dimensiones en centímetros (cm).</small></h3>
               <div>
+                <label htmlFor="tipo_caja">TIPO DE CAJA</label>
+                <select id="tipo_caja" name="tipo_caja" value={tipoDiseno} onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}>
+                  {Object.entries(plantillasCaja).map(([id, plantilla]) => (
+                    <option key={id} value={id}>{plantilla.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              {tipoDiseno === "manual" && <>
+              <div>
                 <label>LARGO ABIERTA *</label>
                 <input
                   type="number"
@@ -1021,12 +1100,14 @@ const empaque =
                 />
               </div>
 
+              </>}
               <div>
                 <label>LARGO ARMADA</label>
                 <input
                   type="number"
                   step="0.01"
                   name="largo_armada"
+                  required={tipoDiseno !== "manual"}
                   value={cotizacion.largo_armada}
                   onChange={cambiarCotizacion}
                   style={{ width: "100%", padding: 10 }}
@@ -1039,6 +1120,7 @@ const empaque =
                   type="number"
                   step="0.01"
                   name="ancho_armada"
+                  required={tipoDiseno !== "manual"}
                   value={cotizacion.ancho_armada}
                   onChange={cambiarCotizacion}
                   style={{ width: "100%", padding: 10 }}
@@ -1051,11 +1133,26 @@ const empaque =
                   type="number"
                   step="0.01"
                   name="alto_armada"
+                  required={tipoDiseno !== "manual"}
                   value={cotizacion.alto_armada}
                   onChange={cambiarCotizacion}
                   style={{ width: "100%", padding: 10 }}
                 />
               </div>
+
+              {plantillasCaja[tipoDiseno].campos.map(({ id, nombre, valor }) => (
+                <div key={id}>
+                  <label htmlFor={`diseno_${id}`}>{nombre}</label>
+                  <input id={`diseno_${id}`} type="number" step="0.01" min="0" required
+                    name={`diseno_${id}`} value={cotizacion[`diseno_${id}`] ?? valor}
+                    onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }} />
+                </div>
+              ))}
+              {tipoDiseno !== "manual" && (
+                <p>{caja
+                  ? `Caja abierta: ${Number(largoCaja.toFixed(3))} × ${Number(anchoCaja.toFixed(3))} cm`
+                  : "Completa las medidas. La solapa lateral no puede superar la larga y la reducción debe ser menor que el ancho armado."}</p>
+              )}
 
               <div>
                 <label>MATERIAL Y CALIBRE *</label>
@@ -1331,7 +1428,8 @@ const empaque =
                     >
                       <h4>Opción {index + 1}</h4>
 {opcion.id === [...opcionesMontaje].sort((a,b)=>a.anchoHoja*a.largoHoja-b.anchoHoja*b.largoHoja)[0]?.id && <span className="mp-badge">Montaje mínimo</span>}
-<span aria-label={opcion.columnas + ' columnas por ' + opcion.filas + ' filas'} className="mp-sheet" style={{gridTemplateColumns:'repeat('+opcion.columnas+',1fr)',aspectRatio:opcion.anchoHoja+'/'+opcion.largoHoja}}>{Array.from({length:opcion.piezasPorHoja},(_,i)=><span className="mp-piece" key={i}/>)}</span>
+                      <DibujoMontaje caja={caja} opcion={opcion} />
+                      {caja?.troquel && <small>Azul: corte · Rojo: doblez</small>}
                       <p>
                         <strong>Orientación:</strong> {opcion.orientacion}
                       </p>
