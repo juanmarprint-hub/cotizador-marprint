@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { dimensionesMontaje, medidasCaja, plantillasCaja, tipoCaja, trazadoTroquel } from "../lib/disenoMontaje.mjs";
+import { dimensionesMontaje, medidasCaja, plantillasCaja, posicionFila, tipoCaja, trazadoTroquel } from "../lib/disenoMontaje.mjs";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -116,8 +116,6 @@ function DibujoMontaje({ caja, opcion }) {
   if (!caja) return null;
   const { anchoMontaje, largoMontaje, columnas, filas, orientacion } = opcion;
   const girada = orientacion === "Girada";
-  const pasoX = girada ? caja.pasoLargo : caja.pasoAncho;
-  const pasoY = girada ? caja.pasoAncho : caja.pasoLargo;
   const troquel = caja.troquel ? trazadoTroquel(caja) : null;
   const borde = Math.max(anchoMontaje, largoMontaje) * 0.025;
   const puntosCorte = troquel?.corte.map(punto => punto.join(",")).join(" ");
@@ -128,10 +126,15 @@ function DibujoMontaje({ caja, opcion }) {
         viewBox={`${-borde} ${-borde} ${anchoMontaje + 2 * borde} ${largoMontaje + 2 * borde}`}
         style={{ display: "block", flex: 1, minWidth: 0, height: 190 }}>
         {Array.from({ length: columnas * filas }, (_, i) => {
-          const x = (i % columnas) * pasoX;
-          const y = Math.floor(i / columnas) * pasoY;
+          const columna = i % columnas;
+          const fila = Math.floor(i / columnas);
+          const posicion = posicionFila(caja, girada ? fila : columna, girada ? filas : columnas);
+          const x = girada ? columna * caja.pasoLargo : posicion.avance;
+          const y = girada ? posicion.avance : fila * caja.pasoLargo;
+          const rotacionMontaje = girada ? "" : `translate(${caja.ancho} 0) rotate(90)`;
+          const giroPieza = posicion.invertida ? `translate(${caja.largo} ${caja.ancho}) rotate(180)` : "";
           return (
-            <g key={i} transform={girada ? `translate(${x} ${y})` : `translate(${x + caja.ancho} ${y}) rotate(90)`}>
+            <g key={i} transform={`translate(${x} ${y}) ${rotacionMontaje} ${giroPieza}`}>
               {troquel ? (
                 <>
                   <polygon points={puntosCorte} fill={i % 2 ? "#dbeafe" : "#eff6ff"}
@@ -307,11 +310,12 @@ export default function Home() {
   const anchoCaja = caja?.ancho;
   const pasoLargoCaja = caja?.pasoLargo;
   const pasoAnchoCaja = caja?.pasoAncho;
+  const encajeParesCaja = caja?.encajePares;
 
   useEffect(() => {
     if (largoCaja > 0 && anchoCaja > 0) {
       const opciones = obtenerMejoresMontajes({
-        largo: largoCaja, ancho: anchoCaja, pasoLargo: pasoLargoCaja, pasoAncho: pasoAnchoCaja,
+        largo: largoCaja, ancho: anchoCaja, pasoLargo: pasoLargoCaja, pasoAncho: pasoAnchoCaja, encajePares: encajeParesCaja,
       }, tipoDiseno);
       setOpcionesMontaje(opciones);
       setMontajeSeleccionado(prev => {
@@ -326,7 +330,7 @@ export default function Home() {
 
     if (cargandoVersion.current) { cargandoVersion.current = false; }
     else { setResultados([]); setCalculoVigente(false); }
-  }, [tipoDiseno, largoCaja, anchoCaja, pasoLargoCaja, pasoAnchoCaja]);
+  }, [tipoDiseno, largoCaja, anchoCaja, pasoLargoCaja, pasoAnchoCaja, encajeParesCaja]);
 async function recuperarPassword() {
   const correo = email.trim();
 
