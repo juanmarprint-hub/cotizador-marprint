@@ -327,11 +327,12 @@ export default function Home() {
   const pasoLargoCaja = caja?.pasoLargo;
   const pasoAnchoCaja = caja?.pasoAncho;
   const encajeParesCaja = caja?.encajePares;
+  const encajeFondosCaja = caja?.encajeFondos;
 
   useEffect(() => {
     if (largoCaja > 0 && anchoCaja > 0) {
       const opciones = obtenerMejoresMontajes({
-        largo: largoCaja, ancho: anchoCaja, pasoLargo: pasoLargoCaja, pasoAncho: pasoAnchoCaja, encajePares: encajeParesCaja,
+        largo: largoCaja, ancho: anchoCaja, pasoLargo: pasoLargoCaja, pasoAncho: pasoAnchoCaja, encajePares: encajeParesCaja, encajeFondos: encajeFondosCaja,
       }, tipoDiseno);
       setOpcionesMontaje(opciones);
       setMontajeSeleccionado(prev => {
@@ -346,7 +347,7 @@ export default function Home() {
 
     if (cargandoVersion.current) { cargandoVersion.current = false; }
     else { setResultados([]); setCalculoVigente(false); }
-  }, [tipoDiseno, largoCaja, anchoCaja, pasoLargoCaja, pasoAnchoCaja, encajeParesCaja]);
+  }, [tipoDiseno, largoCaja, anchoCaja, pasoLargoCaja, pasoAnchoCaja, encajeParesCaja, encajeFondosCaja]);
 async function recuperarPassword() {
   const correo = email.trim();
 
