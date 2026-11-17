@@ -134,6 +134,10 @@ function DibujoMontaje({ caja, opcion }) {
   const troquel = caja.troquel ? trazadoTroquel(caja) : null;
   const borde = Math.max(anchoMontaje, largoMontaje) * 0.025;
   const puntosCorte = troquel?.corte.map(punto => punto.join(",")).join(" ");
+  // En la caja con asa, el eje de encaje debe avanzar hacia el fondo del troquel.
+  const rotacionMontaje = girada ? "" : caja.troquel?.broaster
+    ? `translate(0 ${caja.largo}) rotate(-90)`
+    : `translate(${caja.ancho} 0) rotate(90)`;
 
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0", background: "#f8fafc" }}>
@@ -146,7 +150,6 @@ function DibujoMontaje({ caja, opcion }) {
           const posicion = posicionFila(caja, girada ? fila : columna, girada ? filas : columnas);
           const x = girada ? columna * caja.pasoLargo : posicion.avance;
           const y = girada ? posicion.avance : fila * caja.pasoLargo;
-          const rotacionMontaje = girada ? "" : `translate(${caja.ancho} 0) rotate(90)`;
           const giroPieza = posicion.invertida ? `translate(${caja.largo} ${caja.ancho}) rotate(180)` : "";
           return (
             <g key={i} transform={`translate(${x} ${y}) ${rotacionMontaje} ${giroPieza}`}>
