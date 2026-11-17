@@ -127,9 +127,15 @@ function obtenerMejoresMontajes(caja, tipo) {
   return mejores;
 }
 
-function DibujoMontaje({ caja, opcion }) {
+function DibujoMontaje({ caja, opcion, etiquetaVistaPrevia }) {
   if (!caja) return null;
-  const { anchoMontaje, largoMontaje, columnas, filas, orientacion } = opcion;
+  const { anchoMontaje, largoMontaje, columnas, filas, orientacion } = opcion ?? {
+    anchoMontaje: caja.largo,
+    largoMontaje: caja.ancho,
+    columnas: 1,
+    filas: 1,
+    orientacion: "Girada",
+  };
   const girada = orientacion === "Girada";
   const troquel = caja.troquel ? trazadoTroquel(caja) : null;
   const borde = Math.max(anchoMontaje, largoMontaje) * 0.025;
@@ -141,9 +147,9 @@ function DibujoMontaje({ caja, opcion }) {
 
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0", background: "#f8fafc" }}>
-      <svg role="img" aria-label={`Montaje de ${columnas} columnas por ${filas} filas`}
+      <svg role="img" aria-label={etiquetaVistaPrevia ?? `Montaje de ${columnas} columnas por ${filas} filas`}
         viewBox={`${-borde} ${-borde} ${anchoMontaje + 2 * borde} ${largoMontaje + 2 * borde}`}
-        style={{ display: "block", flex: 1, minWidth: 0, height: 190 }}>
+        style={{ display: "block", flex: 1, minWidth: 0, height: opcion ? 190 : 125 }}>
         {Array.from({ length: columnas * filas }, (_, i) => {
           const columna = i % columnas;
           const fila = Math.floor(i / columnas);
@@ -174,7 +180,7 @@ function DibujoMontaje({ caja, opcion }) {
           );
         })}
       </svg>
-      <span style={{ display: "grid", justifyItems: "center", flex: "0 0 92px", padding: 6, color: "#b51649", textAlign: "center" }}>
+      {opcion && <span style={{ display: "grid", justifyItems: "center", flex: "0 0 92px", padding: 6, color: "#b51649", textAlign: "center" }}>
         <svg aria-hidden="true" width="62" height="62" viewBox="0 0 64 64">
           <path d="M 16 41 L 3 32 H 61 L 48 23"
             transform={opcion.ejeFibra === "largo" ? "rotate(90 32 32)" : undefined}
@@ -182,8 +188,27 @@ function DibujoMontaje({ caja, opcion }) {
         </svg>
         <small>Fibra paralela al {opcion.ejeFibra} de la hoja</small>
         {opcion.fibraPerpendicularAlPegue && <small><strong>Fibra perpendicular a la aleta de pegue</strong></small>}
-      </span>
+      </span>}
     </span>
+  );
+}
+
+function VistaPreviaCaja({ tipo }) {
+  const caja = medidasCaja({
+    tipo_caja: tipo,
+    largo_armada: 17.5,
+    ancho_armada: tipo === "pollo_broaster" ? 10 : 6,
+    alto_armada: 9,
+    largo_abierta: 40,
+    ancho_abierta: 24,
+  });
+  const etiqueta = `Vista previa de troquel: ${plantillasCaja[tipo].nombre}`;
+
+  return (
+    <div>
+      <small>Troquel de referencia</small>
+      <DibujoMontaje caja={caja} etiquetaVistaPrevia={etiqueta} />
+    </div>
   );
 }
 
@@ -1110,6 +1135,7 @@ const empaque =
                   ))}
                 </select>
               </div>
+              <VistaPreviaCaja tipo={tipoDiseno} />
 
               {tipoDiseno === "manual" && <>
               <div>
