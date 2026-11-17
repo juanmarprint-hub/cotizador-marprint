@@ -154,6 +154,10 @@ function DibujoMontaje({ caja, opcion }) {
                 <>
                   <polygon points={puntosCorte} fill={i % 2 ? "#dbeafe" : "#eff6ff"}
                     stroke="#24466c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                  {troquel.huecos?.map(({ x, y, ancho, alto, radio }, j) => (
+                    <rect key={j} x={x} y={y} width={ancho} height={alto} rx={radio}
+                      fill="#f8fafc" stroke="#24466c" vectorEffect="non-scaling-stroke" />
+                  ))}
                   {troquel.dobleces.map(([x1, y1, x2, y2], j) => (
                     <line key={j} x1={x1} y1={y1} x2={x2} y2={y2}
                       stroke="#a1422c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
