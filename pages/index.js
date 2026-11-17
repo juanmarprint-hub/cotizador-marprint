@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { dimensionesMontaje, medidasCaja, plantillasCaja, posicionFila, tipoCaja, trazadoTroquel } from "../lib/disenoMontaje.mjs";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -20,19 +21,23 @@ function moneda(valor) {
   }).format(valor || 0);
 }
 
-function obtenerMejoresMontajes(largoCaja, anchoCaja) {
+function obtenerMejoresMontajes(caja, tipo) {
   const margen = 2;
   const opciones = [];
   const orientaciones = [
-    { nombre: "Normal", largo: largoCaja, ancho: anchoCaja },
-    { nombre: "Girada", largo: anchoCaja, ancho: largoCaja },
+    { nombre: "Normal", girada: false },
+    { nombre: "Girada", girada: true },
   ];
 
   for (const orientacion of orientaciones) {
     for (let columnas = 1; columnas <= 10; columnas++) {
       for (let filas = 1; filas <= 10; filas++) {
-        const anchoMontaje = orientacion.ancho * columnas;
-        const largoMontaje = orientacion.largo * filas;
+        const { anchoMontaje, largoMontaje } = tipo === "manual"
+          ? {
+              anchoMontaje: (orientacion.girada ? caja.largo : caja.ancho) * columnas,
+              largoMontaje: (orientacion.girada ? caja.ancho : caja.largo) * filas,
+            }
+          : dimensionesMontaje(caja, columnas, filas, orientacion.girada);
         const anchoHoja = anchoMontaje + margen;
         const largoHoja = largoMontaje + margen;
 
@@ -43,66 +48,168 @@ function obtenerMejoresMontajes(largoCaja, anchoCaja) {
         // La orientación de conversión del rollo es independiente
         // de la orientación de las cajas dentro de la hoja.
         const conversiones = [
-          { anchoCorte: anchoHoja, largoCorte: largoHoja },
-          { anchoCorte: largoHoja, largoCorte: anchoHoja },
+          { anchoCorte: anchoHoja, largoCorte: largoHoja, ejeFibra: "largo" },
+          { anchoCorte: largoHoja, largoCorte: anchoHoja, ejeFibra: "ancho" },
         ];
-        let mejorConversion = null;
-        for (const conversion of conversiones) {
-          for (const rollo of anchosRollo) {
-            if (rollo < conversion.anchoCorte) continue;
-            const areaCosteo = rollo * conversion.largoCorte;
-            const candidata = {
-              rollo,
-              largoCorte: conversion.largoCorte,
-              desperdicioAncho: rollo - conversion.anchoCorte,
-              areaCosteo,
-            };
-            if (!mejorConversion ||
-                candidata.areaCosteo < mejorConversion.areaCosteo - 1e-9 ||
-                (Math.abs(candidata.areaCosteo - mejorConversion.areaCosteo) < 1e-9 &&
-                 candidata.desperdicioAncho < mejorConversion.desperdicioAncho)) {
-              mejorConversion = candidata;
-            }
-          }
+        const conversionesViables = conversiones.flatMap(conversion => {
+          const rollo = anchosRollo.find(ancho => ancho >= conversion.anchoCorte);
+          if (rollo === undefined) return [];
+          return [{
+            rollo,
+            largoCorte: conversion.largoCorte,
+            ejeFibra: conversion.ejeFibra,
+            desperdicioAncho: rollo - conversion.anchoCorte,
+            areaCosteo: rollo * conversion.largoCorte,
+          }];
+        }).sort((a, b) => Math.abs(a.areaCosteo - b.areaCosteo) > 1e-9
+          ? a.areaCosteo - b.areaCosteo
+          : a.desperdicioAncho - b.desperdicioAncho);
+
+        // El doblez de la aleta de pegue corre en el eje alto del troquel.
+        const ejeAletaPegue = orientacion.girada ? "largo" : "ancho";
+        const candidatas = tipo === "manual" ? conversionesViables.slice(0, 1) : conversionesViables;
+        for (const [indice, conversion] of candidatas.entries()) {
+          const { rollo, largoCorte, ejeFibra, desperdicioAncho, areaCosteo } = conversion;
+          const idBase = `${tipo === "manual" ? "" : tipo + "-"}${orientacion.nombre}-${columnas}-${filas}-${rollo}-${largoCorte}`;
+          const preferida = conversionesViables[0];
+          const id = indice > 0 && rollo === preferida.rollo && largoCorte === preferida.largoCorte
+            ? `${idBase}-${ejeFibra}` : idBase;
+          opciones.push({
+            id,
+            orientacion: orientacion.nombre,
+            columnas,
+            filas,
+            piezasPorHoja: columnas * filas,
+            anchoMontaje,
+            largoMontaje,
+            anchoHoja,
+            largoHoja,
+            rollo,
+            largoCorte,
+            ejeFibra,
+            ...(tipo !== "manual" && { fibraPerpendicularAlPegue: ejeFibra !== ejeAletaPegue }),
+            desperdicioAncho,
+            aprovechamiento: (anchoMontaje * largoMontaje / areaCosteo) * 100,
+          });
         }
-        if (!mejorConversion) continue;
-        const piezasPorHoja = columnas * filas;
-        const areaPiezas = anchoMontaje * largoMontaje;
-        opciones.push({
-          id: `${orientacion.nombre}-${columnas}-${filas}-${mejorConversion.rollo}-${mejorConversion.largoCorte}`,
-          orientacion: orientacion.nombre,
-          columnas,
-          filas,
-          piezasPorHoja,
-          anchoMontaje,
-          largoMontaje,
-          anchoHoja,
-          largoHoja,
-          rollo: mejorConversion.rollo,
-          largoCorte: mejorConversion.largoCorte,
-          desperdicioAncho: mejorConversion.desperdicioAncho,
-          aprovechamiento: (areaPiezas / mejorConversion.areaCosteo) * 100,
-        });
       }
     }
   }
 
-  const mejores = [...opciones].sort((a, b) => {
+  const ordenadas = [...opciones].sort((a, b) => {
     if (b.piezasPorHoja !== a.piezasPorHoja) return b.piezasPorHoja - a.piezasPorHoja;
     const areaA = a.rollo * a.largoCorte;
     const areaB = b.rollo * b.largoCorte;
     if (areaA !== areaB) return areaA - areaB;
     return a.desperdicioAncho - b.desperdicioAncho;
-  }).slice(0, 4);
+  });
 
   const masPequeno = [...opciones].sort((a, b) =>
     a.anchoHoja * a.largoHoja - b.anchoHoja * b.largoHoja ||
     a.rollo * a.largoCorte - b.rollo * b.largoCorte
   )[0];
+  if (tipo !== "manual") {
+    const elegidas = new Set(ordenadas.filter(opcion => opcion.fibraPerpendicularAlPegue)
+      .slice(0, 2).map(opcion => opcion.id));
+    if (masPequeno) elegidas.add(masPequeno.id);
+    for (const opcion of ordenadas) {
+      if (elegidas.size >= 4) break;
+      elegidas.add(opcion.id);
+    }
+    return ordenadas.filter(opcion => elegidas.has(opcion.id))
+      .sort((a, b) => Number(b.fibraPerpendicularAlPegue) - Number(a.fibraPerpendicularAlPegue));
+  }
+
+  const mejores = ordenadas.slice(0, 4);
   if (masPequeno && !mejores.some((m) => m.id === masPequeno.id)) {
     mejores[3] = masPequeno;
   }
   return mejores;
+}
+
+function DibujoMontaje({ caja, opcion, etiquetaVistaPrevia }) {
+  if (!caja) return null;
+  const { anchoMontaje, largoMontaje, columnas, filas, orientacion } = opcion ?? {
+    anchoMontaje: caja.largo,
+    largoMontaje: caja.ancho,
+    columnas: 1,
+    filas: 1,
+    orientacion: "Girada",
+  };
+  const girada = orientacion === "Girada";
+  const troquel = caja.troquel ? trazadoTroquel(caja) : null;
+  const borde = Math.max(anchoMontaje, largoMontaje) * 0.025;
+  const puntosCorte = troquel?.corte.map(punto => punto.join(",")).join(" ");
+  // En la caja con asa, el eje de encaje debe avanzar hacia el fondo del troquel.
+  const rotacionMontaje = girada ? "" : caja.troquel?.broaster
+    ? `translate(0 ${caja.largo}) rotate(-90)`
+    : `translate(${caja.ancho} 0) rotate(90)`;
+
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0", background: "#f8fafc" }}>
+      <svg role="img" aria-label={etiquetaVistaPrevia ?? `Montaje de ${columnas} columnas por ${filas} filas`}
+        viewBox={`${-borde} ${-borde} ${anchoMontaje + 2 * borde} ${largoMontaje + 2 * borde}`}
+        style={{ display: "block", flex: 1, minWidth: 0, height: opcion ? 190 : 125 }}>
+        {Array.from({ length: columnas * filas }, (_, i) => {
+          const columna = i % columnas;
+          const fila = Math.floor(i / columnas);
+          const posicion = posicionFila(caja, girada ? fila : columna, girada ? filas : columnas);
+          const x = girada ? columna * caja.pasoLargo : posicion.avance;
+          const y = girada ? posicion.avance : fila * caja.pasoLargo;
+          const giroPieza = posicion.invertida ? `translate(${caja.largo} ${caja.ancho}) rotate(180)` : "";
+          return (
+            <g key={i} transform={`translate(${x} ${y}) ${rotacionMontaje} ${giroPieza}`}>
+              {troquel ? (
+                <>
+                  <polygon points={puntosCorte} fill={i % 2 ? "#dbeafe" : "#eff6ff"}
+                    stroke="#24466c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                  {troquel.huecos?.map(({ x, y, ancho, alto, radio }, j) => (
+                    <rect key={j} x={x} y={y} width={ancho} height={alto} rx={radio}
+                      fill="#f8fafc" stroke="#24466c" vectorEffect="non-scaling-stroke" />
+                  ))}
+                  {troquel.dobleces.map(([x1, y1, x2, y2], j) => (
+                    <line key={j} x1={x1} y1={y1} x2={x2} y2={y2}
+                      stroke="#a1422c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                  ))}
+                </>
+              ) : (
+                <rect width={caja.largo} height={caja.ancho} fill="#dbeafe"
+                  stroke="#24466c" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      {opcion && <span style={{ display: "grid", justifyItems: "center", flex: "0 0 92px", padding: 6, color: "#b51649", textAlign: "center" }}>
+        <svg aria-hidden="true" width="62" height="62" viewBox="0 0 64 64">
+          <path d="M 16 41 L 3 32 H 61 L 48 23"
+            transform={opcion.ejeFibra === "largo" ? "rotate(90 32 32)" : undefined}
+            fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        </svg>
+        <small>Fibra paralela al {opcion.ejeFibra} de la hoja</small>
+        {opcion.fibraPerpendicularAlPegue && <small><strong>Fibra perpendicular a la aleta de pegue</strong></small>}
+      </span>}
+    </span>
+  );
+}
+
+function VistaPreviaCaja({ tipo }) {
+  const caja = medidasCaja({
+    tipo_caja: tipo,
+    largo_armada: 17.5,
+    ancho_armada: tipo === "pollo_broaster" ? 10 : 6,
+    alto_armada: 9,
+    largo_abierta: 40,
+    ancho_abierta: 24,
+  });
+  const etiqueta = `Vista previa de troquel: ${plantillasCaja[tipo].nombre}`;
+
+  return (
+    <div>
+      <small>Troquel de referencia</small>
+      <DibujoMontaje caja={caja} etiquetaVistaPrevia={etiqueta} />
+    </div>
+  );
 }
 
 export default function Home() {
@@ -160,6 +267,10 @@ export default function Home() {
     fv: false,
     linea: "",
     nombre_producto: "",
+    tipo_caja: "",
+    diseno_cierre_mm: "",
+    diseno_ajuste: "",
+    diseno_separacion: "",
     largo_abierta: "",
     ancho_abierta: "",
     largo_armada: "",
@@ -241,12 +352,20 @@ export default function Home() {
     if (usuario) cargarCatalogos();
   }, [usuario]);
 
-  useEffect(() => {
-    const largo = parseFloat(cotizacion.largo_abierta);
-    const ancho = parseFloat(cotizacion.ancho_abierta);
+  const tipoDiseno = tipoCaja(cotizacion);
+  const caja = medidasCaja(cotizacion);
+  const largoCaja = caja?.largo;
+  const anchoCaja = caja?.ancho;
+  const pasoLargoCaja = caja?.pasoLargo;
+  const pasoAnchoCaja = caja?.pasoAncho;
+  const encajeParesCaja = caja?.encajePares;
+  const encajeFondosCaja = caja?.encajeFondos;
 
-    if (largo > 0 && ancho > 0) {
-      const opciones = obtenerMejoresMontajes(largo, ancho);
+  useEffect(() => {
+    if (largoCaja > 0 && anchoCaja > 0) {
+      const opciones = obtenerMejoresMontajes({
+        largo: largoCaja, ancho: anchoCaja, pasoLargo: pasoLargoCaja, pasoAncho: pasoAnchoCaja, encajePares: encajeParesCaja, encajeFondos: encajeFondosCaja,
+      }, tipoDiseno);
       setOpcionesMontaje(opciones);
       setMontajeSeleccionado(prev => {
         const guardado = montajeCargado.current;
@@ -260,7 +379,7 @@ export default function Home() {
 
     if (cargandoVersion.current) { cargandoVersion.current = false; }
     else { setResultados([]); setCalculoVigente(false); }
-  }, [cotizacion.largo_abierta, cotizacion.ancho_abierta]);
+  }, [tipoDiseno, largoCaja, anchoCaja, pasoLargoCaja, pasoAnchoCaja, encajeParesCaja, encajeFondosCaja]);
 async function recuperarPassword() {
   const correo = email.trim();
 
@@ -307,9 +426,13 @@ async function recuperarPassword() {
 
   function cambiarCotizacion(e) {
     const { name, value, type, checked } = e.target;
-    setCotizacion({
-      ...cotizacion,
-      [name]: type === "checkbox" ? checked : value,
+    setCotizacion(prev => {
+      const valoresPlantilla = name === "tipo_caja"
+        ? Object.fromEntries((plantillasCaja[value]?.campos ?? []).map(({ id, valor }) => [
+            `diseno_${id}`, prev[`diseno_${id}`] || valor,
+          ]))
+        : {};
+      return { ...prev, ...valoresPlantilla, [name]: type === "checkbox" ? checked : value };
     });
     setResultados([]);
     setCalculoVigente(false);
@@ -429,7 +552,15 @@ async function recuperarPassword() {
   function aplicarVersion(version, cabecera, modo = "actualizar") {
     cargandoVersion.current = true;
     montajeCargado.current = version.montaje;
-    setCotizacion(prev => ({ ...prev, ...version.datos,
+    setCotizacion(prev => ({ ...prev,
+      tipo_caja: "manual",
+      ...Object.fromEntries(plantillasCaja.solapas_alternadas.campos.map(({ id, valor }) => [`diseno_${id}`, valor])),
+      ...version.datos,
+      ...(version.datos.tipo_caja === "solapas_alternadas" &&
+          version.datos.diseno_cierre_mm == null &&
+          Number(version.datos.diseno_solapa) > 1.6
+        ? { diseno_cierre_mm: "16" }
+        : {}),
       cliente: modo === "actualizar" ? String(cabecera.cliente_id) : String(version.datos.cliente || "") }));
     setImagenes(version.imagenes || []);
     setResultados(version.resultados || []);
@@ -492,7 +623,9 @@ async function recuperarPassword() {
         p_id: modoEdicion === "actualizar" ? cotizacionId : null,
         p_cliente_id: String(cotizacion.cliente),
         p_producto: cotizacion.nombre_producto,
-        p_datos: cotizacion,
+        p_datos: tipoDiseno === "manual" ? cotizacion : {
+          ...cotizacion, largo_abierta: largoCaja, ancho_abierta: anchoCaja,
+        },
         p_montaje: montajeSeleccionado,
         p_resultados: resultados,
         p_imagenes: imagenes,
@@ -668,9 +801,7 @@ await cargarVersiones(guardada.id);
 
       const costoEspecial = numero(cotizacion.costo_especial) * cantidad;
 
-      const areaCajaM2 =
-  (numero(cotizacion.largo_abierta) *
-    numero(cotizacion.ancho_abierta)) / 10000;
+      const areaCajaM2 = (largoCaja * anchoCaja) / 10000;
 
 const empaque =
   constante("FACTOR EMPAQUE") * areaCajaM2 * cantidad;
@@ -996,6 +1127,18 @@ const empaque =
 
 </div><div className="mp-card mp-grid "><h3>02 · Especificaciones del producto<small>Dimensiones en centímetros (cm).</small></h3>
               <div>
+                <label htmlFor="tipo_caja">TIPO DE CAJA</label>
+                <select id="tipo_caja" name="tipo_caja" value={tipoDiseno} onChange={cambiarCotizacion}
+                  style={{ width: "100%", padding: 10 }}>
+                  {Object.entries(plantillasCaja).map(([id, plantilla]) => (
+                    <option key={id} value={id}>{plantilla.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <VistaPreviaCaja tipo={tipoDiseno} />
+
+              {tipoDiseno === "manual" && <>
+              <div>
                 <label>LARGO ABIERTA *</label>
                 <input
                   type="number"
@@ -1021,12 +1164,14 @@ const empaque =
                 />
               </div>
 
+              </>}
               <div>
                 <label>LARGO ARMADA</label>
                 <input
                   type="number"
                   step="0.01"
                   name="largo_armada"
+                  required={tipoDiseno !== "manual"}
                   value={cotizacion.largo_armada}
                   onChange={cambiarCotizacion}
                   style={{ width: "100%", padding: 10 }}
@@ -1039,6 +1184,7 @@ const empaque =
                   type="number"
                   step="0.01"
                   name="ancho_armada"
+                  required={tipoDiseno !== "manual"}
                   value={cotizacion.ancho_armada}
                   onChange={cambiarCotizacion}
                   style={{ width: "100%", padding: 10 }}
@@ -1051,11 +1197,26 @@ const empaque =
                   type="number"
                   step="0.01"
                   name="alto_armada"
+                  required={tipoDiseno !== "manual"}
                   value={cotizacion.alto_armada}
                   onChange={cambiarCotizacion}
                   style={{ width: "100%", padding: 10 }}
                 />
               </div>
+
+              {plantillasCaja[tipoDiseno].campos.map(({ id, nombre, valor }) => (
+                <div key={id}>
+                  <label htmlFor={`diseno_${id}`}>{nombre}</label>
+                  <input id={`diseno_${id}`} type="number" step="0.01" min="0" required
+                    name={`diseno_${id}`} value={cotizacion[`diseno_${id}`] ?? valor}
+                    onChange={cambiarCotizacion} style={{ width: "100%", padding: 10 }} />
+                </div>
+              ))}
+              {tipoDiseno !== "manual" && (
+                <p>{caja
+                  ? `Caja abierta: ${Number(largoCaja.toFixed(3))} × ${Number(anchoCaja.toFixed(3))} cm`
+                  : "Completa las medidas y verifica que la reducción del último panel sea menor que el ancho armado."}</p>
+              )}
 
               <div>
                 <label>MATERIAL Y CALIBRE *</label>
@@ -1331,7 +1492,8 @@ const empaque =
                     >
                       <h4>Opción {index + 1}</h4>
 {opcion.id === [...opcionesMontaje].sort((a,b)=>a.anchoHoja*a.largoHoja-b.anchoHoja*b.largoHoja)[0]?.id && <span className="mp-badge">Montaje mínimo</span>}
-<span aria-label={opcion.columnas + ' columnas por ' + opcion.filas + ' filas'} className="mp-sheet" style={{gridTemplateColumns:'repeat('+opcion.columnas+',1fr)',aspectRatio:opcion.anchoHoja+'/'+opcion.largoHoja}}>{Array.from({length:opcion.piezasPorHoja},(_,i)=><span className="mp-piece" key={i}/>)}</span>
+                      <DibujoMontaje caja={caja} opcion={opcion} />
+                      {caja?.troquel && <small>Azul: corte · Rojo: doblez</small>}
                       <p>
                         <strong>Orientación:</strong> {opcion.orientacion}
                       </p>
